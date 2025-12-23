@@ -301,13 +301,13 @@ local function setupESP(player)
             end
         end
         
-        -- New BillboardGui (username above head)
+        -- New BillboardGui (username above head - BIGGER)
         local head = char:WaitForChild("Head")
         data.billboard = Instance.new("BillboardGui")
         data.billboard.Name = "ESPNameGui"
         data.billboard.Adornee = head
-        data.billboard.Size = UDim2.new(0, 300, 0, 60)
-        data.billboard.StudsOffset = Vector3.new(0, 3, 0)
+        data.billboard.Size = UDim2.new(0, 400, 0, 100)  -- Bigger canvas
+        data.billboard.StudsOffset = Vector3.new(0, 4, 0)  -- A bit higher so it doesn't clip
         data.billboard.Parent = head
         data.billboard.AlwaysOnTop = true
         data.billboard.LightInfluence = 0
@@ -320,8 +320,10 @@ local function setupESP(player)
         textLabel.TextColor3 = color
         textLabel.TextStrokeTransparency = 0
         textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+        textLabel.TextStrokeTransparency = 0.3  -- Slightly less thick stroke for cleaner look
         textLabel.Font = Enum.Font.GothamBold
-        textLabel.TextScaled = true
+        textLabel.TextScaled = false
+        textLabel.TextSize = 32  -- Big readable text (try 28-40)
         textLabel.Parent = data.billboard
         
         -- New parts: force visible
