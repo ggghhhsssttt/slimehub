@@ -1,60 +1,97 @@
--- SMART AP v3 LocalScript
+-- SMART AP v5 LocalScript
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
+local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local STEAL_ANIM_ID = "rbxassetid://71186871415348"
+
 
 if getgenv().__SMART_AP_LOADED__ then return end
 getgenv().__SMART_AP_LOADED__ = true
 
--- Command cooldowns
-local COMMANDS = {rocket = 120, balloon = 30, ragdoll = 30}
-local lastUsed = {rocket = 0, balloon = 0, ragdoll = 0}
+-- =========================
+-- COMMAND DATA
+-- =========================
+local COMMANDS = {
+	rocket = 120,
+	ragdoll = 30,
+	balloon = 30,
+	inverse = 60,
+	jail = 60,
+	tiny = 60,
+	jumpscare = 60,
+	morph = 60,
+}
 
--- GUI setup
+local lastUsed = {}
+local enabledCommands = {}
+for cmd in pairs(COMMANDS) do
+	lastUsed[cmd] = 0
+	enabledCommands[cmd] = true
+end
+
+-- =========================
+-- GUI SETUP
+-- =========================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "SMART_AP_GUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = CoreGui or LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.Parent = CoreGui
 
 local Frame = Instance.new("Frame")
-Frame.Name = "Root"
-Frame.Size = UDim2.fromOffset(300, 450)
-Frame.Position = UDim2.fromOffset(137, 157)
+Frame.Size = UDim2.fromOffset(340, 520)
+Frame.Position = UDim2.fromOffset(140, 160)
 Frame.BackgroundColor3 = Color3.fromRGB(18,18,18)
-Frame.BorderSizePixel = 0
-Frame.BackgroundTransparency = 0.08
 Frame.Parent = ScreenGui
+Instance.new("UICorner", Frame).CornerRadius = UDim.new(0,12)
 
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Thickness = 1
-UIStroke.Color = Color3.fromRGB(255,70,85)
-UIStroke.Transparency = 0.25
-UIStroke.Parent = Frame
-
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0,12)
-UICorner.Parent = Frame
-
--- Top bar
 local TopBar = Instance.new("Frame")
-TopBar.Name = "TopBar"
 TopBar.Size = UDim2.new(1,0,0,36)
 TopBar.BackgroundColor3 = Color3.fromRGB(28,28,28)
-TopBar.BorderSizePixel = 0
 TopBar.Parent = Frame
+Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0,12)
 
-local TopCorner = Instance.new("UICorner")
-TopCorner.CornerRadius = UDim.new(0,12)
-TopCorner.Parent = TopBar
+-- DRAGGING LOGIC
+do
+	local dragging = false
+	local dragStart
+	local startPos
+
+	TopBar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			dragStart = input.Position
+			startPos = Frame.Position
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			local delta = input.Position - dragStart
+			Frame.Position = UDim2.fromOffset(
+				startPos.X.Offset + delta.X,
+				startPos.Y.Offset + delta.Y
+			)
+		end
+	end)
+end
+
+
+
 
 local Title = Instance.new("TextLabel")
-Title.Name = "Title"
 Title.BackgroundTransparency = 1
-Title.Size = UDim2.new(1,-90,1,0)
+Title.Size = UDim2.new(1,-160,1,0)
 Title.Position = UDim2.fromOffset(12,0)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 16
@@ -63,219 +100,275 @@ Title.TextColor3 = Color3.fromRGB(235,235,235)
 Title.Text = "SMART AP"
 Title.Parent = TopBar
 
-local RefreshButton = Instance.new("TextButton")
-RefreshButton.Text = "Refresh"
-RefreshButton.AutoButtonColor = true
-RefreshButton.Font = Enum.Font.Gotham
-RefreshButton.TextSize = 14
-RefreshButton.BackgroundColor3 = Color3.fromRGB(42,42,42)
-RefreshButton.TextColor3 = Color3.fromRGB(235,235,235)
-RefreshButton.Size = UDim2.fromOffset(80,26)
-RefreshButton.Position = UDim2.new(1,-86,0,5)
-RefreshButton.Parent = TopBar
+-- SPAM ALL TOGGLE
+local SpamAll = false
+local SpamBtn = Instance.new("TextButton")
+SpamBtn.Size = UDim2.fromOffset(110,26)
+SpamBtn.Position = UDim2.new(1,-116,0,5)
+SpamBtn.Font = Enum.Font.GothamBold
+SpamBtn.TextSize = 13
+SpamBtn.TextColor3 = Color3.fromRGB(255,255,255)
+SpamBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+SpamBtn.Text = "SPAM ALL: OFF"
+SpamBtn.Parent = TopBar
+Instance.new("UICorner", SpamBtn).CornerRadius = UDim.new(0,8)
 
-local RefreshCorner = Instance.new("UICorner")
-RefreshCorner.CornerRadius = UDim.new(0,8)
-RefreshCorner.Parent = RefreshButton
+SpamBtn.MouseButton1Click:Connect(function()
+	SpamAll = not SpamAll
+	SpamBtn.Text = "SPAM ALL: "..(SpamAll and "ON" or "OFF")
+	SpamBtn.BackgroundColor3 = SpamAll and Color3.fromRGB(180,60,60) or Color3.fromRGB(60,60,60)
+end)
 
--- Player list
+-- =========================
+-- PLAYER LIST
+-- =========================
 local Holder = Instance.new("Frame")
-Holder.Name = "Holder"
 Holder.BackgroundTransparency = 1
-Holder.Size = UDim2.new(1,-16,1,-100)
+Holder.Size = UDim2.new(1,-16,1,-200)
 Holder.Position = UDim2.fromOffset(8,44)
 Holder.Parent = Frame
 
 local Scrolling = Instance.new("ScrollingFrame")
-Scrolling.Name = "List"
-Scrolling.Active = true
-Scrolling.ScrollingDirection = Enum.ScrollingDirection.Y
-Scrolling.ScrollBarThickness = 6
 Scrolling.BackgroundTransparency = 1
 Scrolling.BorderSizePixel = 0
+Scrolling.ScrollBarThickness = 6
 Scrolling.Size = UDim2.new(1,0,1,0)
-Scrolling.CanvasSize = UDim2.fromOffset(0,0)
 Scrolling.Parent = Holder
 
-local ListLayout = Instance.new("UIListLayout")
-ListLayout.Padding = UDim.new(0,6)
-ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ListLayout.Parent = Scrolling
+local UIList = Instance.new("UIListLayout", Scrolling)
+UIList.Padding = UDim.new(0,6)
 
-local UIPadding = Instance.new("UIPadding")
-UIPadding.PaddingTop = UDim.new(0,4)
-UIPadding.PaddingLeft = UDim.new(0,2)
-UIPadding.PaddingRight = UDim.new(0,2)
-UIPadding.PaddingBottom = UDim.new(0,8)
-UIPadding.Parent = Scrolling
-
--- Cooldowns section
+-- =========================
+-- COOLDOWNS + TOGGLES
+-- =========================
 local CooldownsFrame = Instance.new("Frame")
-CooldownsFrame.Size = UDim2.new(1,-16,0,48)
-CooldownsFrame.Position = UDim2.fromOffset(8, Frame.Size.Y.Offset - 52)
+CooldownsFrame.Size = UDim2.new(1,-16,0,150)
+CooldownsFrame.Position = UDim2.fromOffset(8, Frame.Size.Y.Offset - 156)
 CooldownsFrame.BackgroundTransparency = 1
 CooldownsFrame.Parent = Frame
 
-local function createCooldownLabel(name, xOffset)
-	local lbl = Instance.new("TextLabel")
-	lbl.Size = UDim2.fromOffset(90,16)
-	lbl.Position = UDim2.fromOffset(xOffset,0)
-	lbl.BackgroundTransparency = 1
-	lbl.Font = Enum.Font.Gotham
-	lbl.TextSize = 14
-	lbl.TextColor3 = Color3.fromRGB(255,255,255)
-	lbl.Text = name..": 0s"
-	lbl.Parent = CooldownsFrame
-	return lbl
+local cooldownLabels = {}
+local toggleButtons = {}
+
+local x, y = 0, 0
+for cmd, cd in pairs(COMMANDS) do
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.fromOffset(160,20)
+	btn.Position = UDim2.fromOffset(x,y)
+	btn.BackgroundTransparency = 1
+	btn.Font = Enum.Font.Gotham
+	btn.TextSize = 14
+	btn.TextXAlignment = Enum.TextXAlignment.Left
+	btn.TextColor3 = Color3.fromRGB(235,235,235)
+	btn.Text = "☑ "..cmd..": 0s"
+	btn.Parent = CooldownsFrame
+
+	btn.MouseButton1Click:Connect(function()
+		enabledCommands[cmd] = not enabledCommands[cmd]
+		btn.Text = (enabledCommands[cmd] and "☑ " or "☐ ")..cmd..": "..btn.Text:match("(%d+s)") 
+	end)
+
+	cooldownLabels[cmd] = btn
+	toggleButtons[cmd] = btn
+
+	x += 170
+	if x >= 320 then x = 0 y += 22 end
 end
 
-local cooldownLabels = {}
-cooldownLabels.rocket = createCooldownLabel("Rocket",0)
-cooldownLabels.balloon = createCooldownLabel("Balloon",100)
-cooldownLabels.ragdoll = createCooldownLabel("Ragdoll",200)
-
--- Dragging
-local dragging, dragStartPos, startPos
-TopBar.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = true
-		dragStartPos = input.Position
-		startPos = Frame.Position
-		input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then
-				dragging = false
-			end
+-- =========================
+-- REMOTE
+-- =========================
+local function fireCommand(player, cmd)
+	local re = ReplicatedStorage:FindFirstChild("Packages")
+	if not re then return end
+	re = re:FindFirstChild("Net")
+	if not re then return end
+	re = re:FindFirstChild("RE/AdminPanelService/ExecuteCommand")
+	if re then
+		pcall(function()
+			re:FireServer(player, cmd)
 		end)
 	end
-end)
-TopBar.InputChanged:Connect(function(input)
-	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-		local delta = input.Position - dragStartPos
-		Frame.Position = UDim2.fromOffset(startPos.X.Offset + delta.X, startPos.Y.Offset + delta.Y)
-	end
-end)
+end
 
--- Command execution
-local function executeCommand(player)
-	local available = {}
-	local now = tick()
-	for cmd, cd in pairs(COMMANDS) do
-		local elapsed = now - (lastUsed[cmd] or 0)
-		if elapsed >= cd then
-			table.insert(available, cmd)
+-- =========================
+-- EXECUTION LOGIC
+-- =========================
+local function executeOnPlayer(player)
+	if SpamAll then
+		for cmd in pairs(COMMANDS) do
+			fireCommand(player, cmd)
 		end
-	end
-	local cmd
-	if #available > 0 then
-		cmd = available[math.random(1,#available)]
 	else
-		local cmdList = {"ragdoll","balloon","rocket"}
-		cmd = cmdList[math.random(1,#cmdList)]
+		local available = {}
+		local now = os.clock()
+		for cmd, cd in pairs(COMMANDS) do
+			if enabledCommands[cmd] and (now - lastUsed[cmd] >= cd) then
+				table.insert(available, cmd)
+			end
+		end
+		if #available == 0 then
+			for cmd in pairs(COMMANDS) do
+				if enabledCommands[cmd] then
+					table.insert(available, cmd)
+				end
+			end
+		end
+		if #available == 0 then return end
+		fireCommand(player, available[math.random(#available)])
 	end
+end
 
-	lastUsed[cmd] = now
+-- =========================
+-- OWNER DETECTION
+-- =========================
+local function getNearbyPlotOwner()
+	local char = LocalPlayer.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return nil end
 
-	local remote = ReplicatedStorage:FindFirstChild("Packages")
-	if remote then
-		remote = remote:FindFirstChild("Net")
-		if remote then
-			remote = remote:FindFirstChild("RE/AdminPanelService/ExecuteCommand")
-			if remote and remote:IsA("RemoteEvent") then
-				pcall(function()
-					remote:FireServer(player, cmd)
-				end)
+	local plots = Workspace:FindFirstChild("Plots")
+	if not plots then return nil end
+
+	for _, plot in ipairs(plots:GetChildren()) do
+		local sign = plot:FindFirstChild("PlotSign", true)
+		if sign and sign:IsA("BasePart") then
+			if (sign.Position - hrp.Position).Magnitude <= 25 then
+				local gui = sign:FindFirstChildWhichIsA("SurfaceGui", true)
+				if gui and gui:FindFirstChild("Frame") and gui.Frame:FindFirstChild("TextLabel") then
+					local text = gui.Frame.TextLabel.Text
+					local display = text:match("^(.-)'s Base")
+					return display
+				end
 			end
 		end
 	end
 end
 
--- Cooldown display update
-RunService.RenderStepped:Connect(function()
-	local now = tick()
-	for cmd, cd in pairs(COMMANDS) do
-		local last = lastUsed[cmd] or 0
-		local remaining = math.max(0, cd - (now - last))
-		cooldownLabels[cmd].Text = cmd:sub(1,1):upper()..cmd:sub(2)..": "..math.floor(remaining).."s"
-	end
-end)
+-- =========================
+-- PLAYER BUTTON
+-- =========================
+local playerButtons = {}
 
--- Player button creation
 local function createPlayerButton(player)
 	local btn = Instance.new("TextButton")
-	btn.Name = "P_"..player.UserId
-	btn.Size = UDim2.new(1,-6,0,34)
+	btn.Size = UDim2.new(1,-6,0,36)
 	btn.BackgroundColor3 = Color3.fromRGB(38,38,38)
 	btn.Text = ""
-	btn.AutoButtonColor = true
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0,8)
-	corner.Parent = btn
+	btn.Parent = Scrolling
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
 
-	-- Icon
 	local icon = Instance.new("ImageLabel")
 	icon.Size = UDim2.fromOffset(28,28)
-	icon.Position = UDim2.fromOffset(4,3)
+	icon.Position = UDim2.fromOffset(4,4)
 	icon.BackgroundTransparency = 1
 	icon.Image = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
 	icon.Parent = btn
 
-	-- Name
-	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Size = UDim2.new(1,-36,1,0)
-	nameLabel.Position = UDim2.fromOffset(36,0)
-	nameLabel.BackgroundTransparency = 1
-	nameLabel.Font = Enum.Font.Gotham
-	nameLabel.TextSize = 14
-	nameLabel.TextColor3 = Color3.fromRGB(235,235,235)
-	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-	nameLabel.Text = player.DisplayName.." ("..player.Name..")"
-	nameLabel.Parent = btn
+	local name = Instance.new("TextLabel")
+	name.BackgroundTransparency = 1
+	name.Position = UDim2.fromOffset(38,0)
+	name.Size = UDim2.new(1,-40,1,0)
+	name.Font = Enum.Font.Gotham
+	name.TextSize = 14
+	name.TextXAlignment = Enum.TextXAlignment.Left
+	name.TextColor3 = Color3.fromRGB(235,235,235)
+	name.Text = player.DisplayName.." ("..player.Name..")"
+	name.Parent = btn
 
-	-- Stealing indicator
-	local stealLabel = Instance.new("TextLabel")
-	stealLabel.Size = UDim2.fromOffset(60,16)
-	stealLabel.Position = UDim2.new(1, -65,0,9)
-	stealLabel.BackgroundTransparency = 1
-	stealLabel.Font = Enum.Font.GothamBold
-	stealLabel.TextSize = 12
-	stealLabel.TextColor3 = Color3.fromRGB(255,0,0)
-	stealLabel.Text = "STEALING"
-	stealLabel.Visible = false
-	stealLabel.Parent = btn
+	local ownerTag = Instance.new("TextLabel")
+	ownerTag.BackgroundTransparency = 1
+	ownerTag.Position = UDim2.new(1,-80,0,10)
+	ownerTag.Size = UDim2.fromOffset(76,16)
+	ownerTag.Font = Enum.Font.GothamBold
+	ownerTag.TextSize = 12
+	ownerTag.TextColor3 = Color3.fromRGB(255,215,0)
+	ownerTag.Text = "⭐OWNER⭐"
+	ownerTag.Visible = false
+	ownerTag.Parent = btn
 
-	RunService.RenderStepped:Connect(function()
-		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			local stealing = false
-			for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
-				local animId = tonumber(track.Animation.AnimationId:match("%d+"))
-				if animId == 71186871415348 then
-					stealing = true
-					break
-				end
-			end
-			stealLabel.Visible = stealing
-		end
+	btn.MouseButton1Click:Connect(function()
+		executeOnPlayer(player)
 	end)
 
-	btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(48,48,48) end)
-	btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(38,38,38) end)
-	btn.Activated:Connect(function() executeCommand(player) end)
-	btn.Parent = Scrolling
+	playerButtons[player] = ownerTag
 end
 
-local function updatePlayerList()
-	for _, child in pairs(Scrolling:GetChildren()) do
-		if child:IsA("TextButton") then child:Destroy() end
+local function refreshPlayers()
+	for _,c in ipairs(Scrolling:GetChildren()) do
+		if c:IsA("TextButton") then c:Destroy() end
 	end
-	for _, p in pairs(Players:GetPlayers()) do
-		if p ~= LocalPlayer and p.Name ~= "jihallzb790" then
+	playerButtons = {}
+	for _,p in ipairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer then
 			createPlayerButton(p)
 		end
 	end
 end
 
-RefreshButton.MouseButton1Click:Connect(updatePlayerList)
-Players.PlayerAdded:Connect(updatePlayerList)
-Players.PlayerRemoving:Connect(updatePlayerList)
-updatePlayerList()
+Players.PlayerAdded:Connect(refreshPlayers)
+Players.PlayerRemoving:Connect(refreshPlayers)
+refreshPlayers()
+
+-- =========================
+-- NOTIFICATION LISTENER
+-- =========================
+task.spawn(function()
+	local notif = LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("Notification"):WaitForChild("Notification")
+	notif.ChildAdded:Connect(function(child)
+		if not child:IsA("TextLabel") then return end
+		local cmd = child.Text:match('executed%s+"(.-)"')
+		if cmd and COMMANDS[cmd] then
+			lastUsed[cmd] = os.clock()
+		end
+	end)
+end)
+
+
+local function isPlayerStealing(player)
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if not hum then return false end
+
+	for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
+		if track.Animation and track.Animation.AnimationId == STEAL_ANIM_ID then
+			return true
+		end
+	end
+	return false
+end
+
+
+-- =========================
+-- LIGHT 1s UPDATE LOOP
+-- =========================
+task.spawn(function()
+	while true do
+		local now = os.clock()
+		local ownerDisplay = getNearbyPlotOwner()
+		for cmd, cd in pairs(COMMANDS) do
+			local remaining = math.max(0, math.ceil(cd - (now - lastUsed[cmd])))
+			local prefix = enabledCommands[cmd] and "☑ " or "☐ "
+			cooldownLabels[cmd].Text = prefix..cmd..": "..remaining.."s"
+		end
+for plr, ownerTag in pairs(playerButtons) do
+	local nameLabel = ownerTag.Parent:FindFirstChildOfClass("TextLabel")
+	if nameLabel then
+		local text = plr.Name.." ("..plr.DisplayName..")"
+
+		if ownerDisplay and plr.DisplayName == ownerDisplay then
+			ownerTag.Visible = true
+		else
+			ownerTag.Visible = false
+		end
+
+		if isPlayerStealing(plr) then
+			text ..= " 🔴"
+		end
+
+		nameLabel.Text = text
+	end
+end
+		task.wait(1)
+	end
+end)
