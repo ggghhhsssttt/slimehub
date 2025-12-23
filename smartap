@@ -55,6 +55,22 @@ TopBar.BackgroundColor3 = Color3.fromRGB(28,28,28)
 TopBar.Parent = Frame
 Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0,12)
 
+local RefreshBtn = Instance.new("TextButton")
+RefreshBtn.Size = UDim2.fromOffset(90, 26)
+RefreshBtn.Position = UDim2.new(1, -212, 0, 5)
+RefreshBtn.Font = Enum.Font.GothamBold
+RefreshBtn.TextSize = 13
+RefreshBtn.TextColor3 = Color3.fromRGB(255,255,255)
+RefreshBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+RefreshBtn.Text = "REFRESH"
+RefreshBtn.Parent = TopBar
+Instance.new("UICorner", RefreshBtn).CornerRadius = UDim.new(0,8)
+
+RefreshBtn.MouseButton1Click:Connect(function()
+	refreshPlayers()
+end)
+
+
 -- DRAGGING LOGIC
 do
 	local dragging = false
