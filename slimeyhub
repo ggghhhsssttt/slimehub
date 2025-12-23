@@ -210,28 +210,18 @@ _G.antiLagConn = player.CharacterAdded:Connect(function()
 end)
 
 
--- SLIMEY HUB ESP - FULLY OPTIMIZED
+-- SLIMEY HUB ESP FIXED
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
 
 -- SETTINGS
+local ESP_COLOR = Color3.fromRGB(255, 255, 255) -- White
 local FILL_TRANSPARENCY = 0.5
 local OUTLINE_TRANSPARENCY = 0
-local NAME_OFFSET = Vector3.new(0,3,0)
 
--- Caches
-local espCache = {}
-local nameCache = {}
-local colorCache = {}
-
-local function randomColor()
-	return Color3.fromHSV(math.random(), 0.85, 1)
-end
-
--- Force parts visible
-local function forceVisible(character)
+-- FORCE ALL PARTS VISIBLE
+local function forceTransparencyZero(character)
 	for _, part in ipairs(character:GetDescendants()) do
 		if part:IsA("BasePart") then
 			part.Transparency = 0
@@ -239,103 +229,67 @@ local function forceVisible(character)
 	end
 end
 
--- Cleanup old ESP
-local function removeESP(player)
-	if espCache[player] then
-		pcall(function() espCache[player]:Destroy() end)
-	end
-	if nameCache[player] then
-		pcall(function() nameCache[player]:Destroy() end)
-	end
-	espCache[player] = nil
-	nameCache[player] = nil
-	colorCache[player] = nil
-end
-
--- Apply ESP + Name
-local function applyESP(player)
-	if player == LocalPlayer then return end
-	local char = player.Character
-	if not char then return end
-
-	removeESP(player)
-	forceVisible(char)
-
-	-- Random color per player
-	if not colorCache[player] then
-		colorCache[player] = randomColor()
-	end
-	local color = colorCache[player]
-
-	-- Highlight
-	local hl = Instance.new("Highlight")
-	hl.Name = "SlimeyESP"
-	hl.Adornee = char
-	hl.FillColor = color
-	hl.OutlineColor = color
-	hl.FillTransparency = FILL_TRANSPARENCY
-	hl.OutlineTransparency = OUTLINE_TRANSPARENCY
-	hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	hl.Parent = CoreGui
-	espCache[player] = hl
-
-	-- Name tag above head
-	local head = char:FindFirstChild("Head")
-	if head then
-		local billboard = Instance.new("BillboardGui")
-		billboard.Name = "SlimeyNameESP"
-		billboard.Adornee = head
-		billboard.Size = UDim2.fromOffset(200,40)
-		billboard.StudsOffset = NAME_OFFSET
-		billboard.AlwaysOnTop = true
-		billboard.Parent = CoreGui
-
-		local text = Instance.new("TextLabel")
-		text.Size = UDim2.fromScale(1,1)
-		text.BackgroundTransparency = 1
-		text.Text = player.Name
-		text.Font = Enum.Font.GothamBold
-		text.TextSize = 16
-		text.TextColor3 = color
-		text.TextStrokeTransparency = 0.25
-		text.TextXAlignment = Enum.TextXAlignment.Center
-		text.TextYAlignment = Enum.TextYAlignment.Center
-		text.Parent = billboard
-
-		nameCache[player] = billboard
+-- REMOVE OLD HIGHLIGHT
+local function removeHighlight(character)
+	for _, obj in ipairs(CoreGui:GetChildren()) do
+		if obj:IsA("Highlight") and obj.Adornee == character then
+			obj:Destroy()
+		end
 	end
 end
 
--- Player setup
-local function setupPlayer(player)
-	player.CharacterAdded:Connect(function()
-		task.wait(0.1)
-		applyESP(player)
-	end)
-
-	player:GetPropertyChangedSignal("Team"):Connect(function()
-		applyESP(player)
-	end)
-
+-- APPLY ESP
+local function updateHighlight(player)
 	if player.Character then
-		applyESP(player)
+		removeHighlight(player.Character)
+		forceTransparencyZero(player.Character)
+	end
+
+	if player ~= LocalPlayer then
+		player.CharacterAdded:Connect(function(char)
+			task.wait(0.5)
+			updateHighlight(player)
+		end)
+
+		if player.Character then
+			local highlight = Instance.new("Highlight")
+			highlight.Name = "SlimeyESP"
+			highlight.Adornee = player.Character
+			highlight.FillColor = ESP_COLOR
+			highlight.OutlineColor = ESP_COLOR
+			highlight.FillTransparency = FILL_TRANSPARENCY
+			highlight.OutlineTransparency = OUTLINE_TRANSPARENCY
+			highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+			highlight.Parent = CoreGui
+		end
 	end
 end
 
--- Cleanup when leaving
-Players.PlayerRemoving:Connect(function(player)
-	removeESP(player)
-end)
-
--- Init existing players
-for _, plr in ipairs(Players:GetPlayers()) do
-	setupPlayer(plr)
+-- WATCH TEAM CHANGES
+local function setupPlayer(player)
+	player:GetPropertyChangedSignal("Team"):Connect(function()
+		updateHighlight(player)
+	end)
+	updateHighlight(player)
 end
 
--- New players
+-- INITIALIZE FOR EXISTING PLAYERS
+for _, player in ipairs(Players:GetPlayers()) do
+	setupPlayer(player)
+end
+
+-- WATCH NEW PLAYERS
 Players.PlayerAdded:Connect(setupPlayer)
 
-print("👁️ Slimey Hub ESP active (R15 + invisible safe)")
+-- CLEANUP ON LEAVE
+Players.PlayerRemoving:Connect(function(player)
+	if player.Character then
+		removeHighlight(player.Character)
+	end
+end)
+
+print("✅ Slimey Hub ESP enabled (Highlights + Fill + Outline + Forced Transparency)")
+
 
 
 
