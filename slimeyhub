@@ -210,134 +210,162 @@ _G.antiLagConn = player.CharacterAdded:Connect(function()
 end)
 
 
--- SLIMEY HUB ESP v2
+-- Lightweight Optimized Player ESP System (with Colored Username + R15 Anti-Invis)
+-- Paste into any LocalScript
+-- • Randomized consistent color per player (8 main colors)
+-- • Highlight on entire character
+-- • Billboard username above head (same color, stroke for visibility)
+-- • Forces Transparency=0 on ALL BaseParts except __HITBOX (counters invis cloaks)
+-- • Explicit R15 parts enforced every ~0.16s (low-lag global loop)
+-- • Super optimized: minimal connections, no per-player loops
+
 local Players = game:GetService("Players")
-local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
--- SETTINGS
-local FILL_TRANSPARENCY = 0.5
-local OUTLINE_TRANSPARENCY = 0
-local LABEL_OFFSET = Vector3.new(0, 3, 0) -- above head
+local COLORS = {
+    Color3.fromRGB(255, 0, 0),     -- Red
+    Color3.fromRGB(255, 165, 0),   -- Orange
+    Color3.fromRGB(255, 255, 0),   -- Yellow
+    Color3.fromRGB(0, 255, 0),     -- Green
+    Color3.fromRGB(0, 0, 255),     -- Blue
+    Color3.fromRGB(128, 0, 128),   -- Purple
+    Color3.fromRGB(0, 255, 255),   -- Cyan
+    Color3.fromRGB(165, 42, 42),   -- Brown
+}
 
--- Random color generator
-local function randomColor()
-	return Color3.fromHSV(math.random(), 1, 1)
+local R15_PARTS = {
+    "Head", "UpperTorso", "LowerTorso",
+    "LeftFoot", "LeftLowerLeg", "LeftUpperLeg",
+    "RightFoot", "RightLowerLeg", "RightUpperLeg",
+    "LeftHand", "LeftLowerArm", "LeftUpperArm",
+    "RightHand", "RightLowerArm", "RightUpperArm"
+}
+
+local playerData = {}  -- [player] = {highlight, billboard}
+local playerColor = {} -- [player] = Color3
+
+-- Global low-lag enforcer (every ~0.16s, only R15 parts)
+local frameCount = 0
+local enforcer = RunService.Stepped:Connect(function()
+    frameCount += 1
+    if frameCount % 10 ~= 0 then return end  -- ~0.16s interval
+    
+    for player, _ in pairs(playerData) do
+        local char = player.Character
+        if char then
+            for _, partName in ipairs(R15_PARTS) do
+                local part = char:FindFirstChild(partName)
+                if part and part.Transparency > 0 then
+                    part.Transparency = 0
+                end
+            end
+        end
+    end
+end)
+
+-- Setup ESP for player
+local function setupESP(player)
+    if player == LocalPlayer then return end
+    
+    -- Consistent random color (seeded by UserId)
+    if not playerColor[player] then
+        math.randomseed(player.UserId)
+        playerColor[player] = COLORS[math.random(#COLORS)]
+    end
+    local color = playerColor[player]
+    
+    playerData[player] = {}
+    
+    local function onCharacterAdded(char)
+        local data = playerData[player]
+        if not data then return end
+        
+        -- Cleanup old
+        if data.highlight then data.highlight:Destroy() end
+        if data.billboard then data.billboard:Destroy() end
+        
+        -- New Highlight
+        data.highlight = Instance.new("Highlight")
+        data.highlight.FillColor = color
+        data.highlight.OutlineColor = color
+        data.highlight.FillTransparency = 0.4
+        data.highlight.OutlineTransparency = 0
+        data.highlight.Adornee = char
+        data.highlight.Parent = char
+        
+        -- Force ALL parts visible (initial sweep)
+        for _, obj in ipairs(char:GetDescendants()) do
+            if obj:IsA("BasePart") and obj.Name ~= "__HITBOX" then
+                obj.Transparency = 0
+            end
+        end
+        
+        -- New BillboardGui (username above head)
+        local head = char:WaitForChild("Head")
+        data.billboard = Instance.new("BillboardGui")
+        data.billboard.Name = "ESPNameGui"
+        data.billboard.Adornee = head
+        data.billboard.Size = UDim2.new(0, 300, 0, 60)
+        data.billboard.StudsOffset = Vector3.new(0, 3, 0)
+        data.billboard.Parent = head
+        data.billboard.AlwaysOnTop = true
+        data.billboard.LightInfluence = 0
+        
+        local textLabel = Instance.new("TextLabel")
+        textLabel.Name = "NameLabel"
+        textLabel.Size = UDim2.new(1, 0, 1, 0)
+        textLabel.BackgroundTransparency = 1
+        textLabel.Text = player.DisplayName .. "\n(" .. player.Name .. ")"
+        textLabel.TextColor3 = color
+        textLabel.TextStrokeTransparency = 0
+        textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+        textLabel.Font = Enum.Font.GothamBold
+        textLabel.TextScaled = true
+        textLabel.Parent = data.billboard
+        
+        -- New parts: force visible
+        char.DescendantAdded:Connect(function(desc)
+            if desc:IsA("BasePart") and desc.Name ~= "__HITBOX" then
+                desc.Transparency = 0
+            end
+        end)
+    end
+    
+    if player.Character then
+        onCharacterAdded(player.Character)
+    end
+    player.CharacterAdded:Connect(onCharacterAdded)
 end
 
--- FORCE TRANSPARENCY = 0 AND HIDE __HITBOX
-local function forceVisibility(character)
-	for _, part in ipairs(character:GetDescendants()) do
-		if part:IsA("BasePart") then
-			if part.Name == "__HITBOX" then
-				part.Transparency = 1
-				part.CanCollide = false
-			else
-				part.Transparency = 0
-			end
-		end
-	end
+-- Cleanup
+local function cleanupPlayer(player)
+    if playerData[player] then
+        if playerData[player].highlight then
+            playerData[player].highlight:Destroy()
+        end
+        if playerData[player].billboard then
+            playerData[player].billboard:Destroy()
+        end
+        playerData[player] = nil
+    end
+    playerColor[player] = nil
 end
 
--- REMOVE OLD ESP
-local function removeESP(character)
-	for _, obj in ipairs(CoreGui:GetChildren()) do
-		if (obj:IsA("Highlight") or obj:IsA("BillboardGui")) and obj.Adornee == character then
-			obj:Destroy()
-		end
-	end
-end
-
--- CREATE ESP FOR PLAYER
-local function createESP(player)
-	if player == LocalPlayer then return end
-	local char = player.Character
-	if not char then return end
-
-	removeESP(char)
-	forceVisibility(char)
-
-	local color = randomColor()
-
-	-- Highlight
-	local highlight = Instance.new("Highlight")
-	highlight.Name = "SlimeyESP"
-	highlight.Adornee = char
-	highlight.FillColor = color
-	highlight.OutlineColor = color
-	highlight.FillTransparency = FILL_TRANSPARENCY
-	highlight.OutlineTransparency = OUTLINE_TRANSPARENCY
-	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.Parent = CoreGui
-
-	-- Name tag
-	local head = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
-	if head then
-		local billboard = Instance.new("BillboardGui")
-		billboard.Adornee = head
-		billboard.Size = UDim2.new(0,100,0,20)
-		billboard.StudsOffset = LABEL_OFFSET
-		billboard.AlwaysOnTop = true
-		billboard.Name = "SlimeyNameTag"
-		billboard.Parent = CoreGui
-
-		local label = Instance.new("TextLabel")
-		label.Size = UDim2.new(1,0,1,0)
-		label.BackgroundTransparency = 1
-		label.TextColor3 = color
-		label.TextStrokeTransparency = 0
-		label.Font = Enum.Font.GothamBold
-		label.TextScaled = true
-		label.Text = player.Name
-		label.Parent = billboard
-	end
-end
-
--- UPDATE ESP WHEN CHARACTER ADDED
-local function setupPlayer(player)
-	player.CharacterAdded:Connect(function()
-		task.wait(0.5)
-		createESP(player)
-	end)
-	createESP(player)
-end
-
--- INITIALIZE EXISTING PLAYERS
+-- Init existing
 for _, player in ipairs(Players:GetPlayers()) do
-	setupPlayer(player)
+    task.spawn(setupESP, player)
 end
 
--- WATCH NEW PLAYERS
-Players.PlayerAdded:Connect(setupPlayer)
+Players.PlayerAdded:Connect(setupESP)
+Players.PlayerRemoving:Connect(cleanupPlayer)
 
--- CLEANUP ON LEAVE
-Players.PlayerRemoving:Connect(function(player)
-	if player.Character then
-		removeESP(player.Character)
-	end
+-- Cleanup LocalPlayer data on leave (just in case)
+LocalPlayer.AncestryChanged:Connect(function()
+    cleanupPlayer(LocalPlayer)
 end)
 
--- UPDATE COLORS RANDOMLY EVERY 10 SECONDS
-RunService.Heartbeat:Connect(function()
-	for _, player in ipairs(Players:GetPlayers()) do
-		local char = player.Character
-		if char and player ~= LocalPlayer then
-			local highlight = CoreGui:FindFirstChild("SlimeyESP")
-			if highlight and highlight.Adornee == char then
-				highlight.FillColor = randomColor()
-				highlight.OutlineColor = highlight.FillColor
-			end
-			local billboard = CoreGui:FindFirstChild("SlimeyNameTag")
-			if billboard and billboard.Adornee == char then
-				billboard:FindFirstChildOfClass("TextLabel").TextColor3 = highlight.FillColor
-			end
-		end
-	end
-end)
-
-print("✅ Slimey Hub ESP with highlights, names, and randomized colors enabled")
-
+print("Enhanced ESP loaded! Colored usernames + full R15 anti-invis + highlights.")
 
 
 
