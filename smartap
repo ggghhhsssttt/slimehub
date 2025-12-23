@@ -119,23 +119,6 @@ SpamBtn.MouseButton1Click:Connect(function()
 	SpamBtn.BackgroundColor3 = SpamAll and Color3.fromRGB(180,60,60) or Color3.fromRGB(60,60,60)
 end)
 
--- REFRESH BUTTON
-local RefreshBtn = Instance.new("TextButton")
-RefreshBtn.Size = UDim2.fromOffset(90, 26)
-RefreshBtn.Position = UDim2.new(1, -212, 0, 5) -- next to SPAM ALL
-RefreshBtn.Font = Enum.Font.GothamBold
-RefreshBtn.TextSize = 13
-RefreshBtn.TextColor3 = Color3.fromRGB(255,255,255)
-RefreshBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-RefreshBtn.Text = "REFRESH"
-RefreshBtn.Parent = TopBar
-Instance.new("UICorner", RefreshBtn).CornerRadius = UDim.new(0,8)
-
-RefreshBtn.MouseButton1Click:Connect(function()
-	refreshPlayers()
-end)
-
-
 -- =========================
 -- PLAYER LIST
 -- =========================
@@ -268,64 +251,73 @@ end
 local playerButtons = {}
 
 local function createPlayerButton(player)
-	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(1,-6,0,36)
-	btn.BackgroundColor3 = Color3.fromRGB(38,38,38)
-	btn.Text = ""
-	btn.Parent = Scrolling
-	Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
+    if playerButtons[player] then return end -- already exists
 
-	local icon = Instance.new("ImageLabel")
-	icon.Size = UDim2.fromOffset(28,28)
-	icon.Position = UDim2.fromOffset(4,4)
-	icon.BackgroundTransparency = 1
-	icon.Image = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
-	icon.Parent = btn
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1,-6,0,36)
+    btn.BackgroundColor3 = Color3.fromRGB(38,38,38)
+    btn.Text = ""
+    btn.Parent = Scrolling
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
 
-	local name = Instance.new("TextLabel")
-	name.BackgroundTransparency = 1
-	name.Position = UDim2.fromOffset(38,0)
-	name.Size = UDim2.new(1,-40,1,0)
-	name.Font = Enum.Font.Gotham
-	name.TextSize = 14
-	name.TextXAlignment = Enum.TextXAlignment.Left
-	name.TextColor3 = Color3.fromRGB(235,235,235)
-	name.Text = player.DisplayName.." ("..player.Name..")"
-	name.Parent = btn
+    local icon = Instance.new("ImageLabel")
+    icon.Size = UDim2.fromOffset(28,28)
+    icon.Position = UDim2.fromOffset(4,4)
+    icon.BackgroundTransparency = 1
+    icon.Image = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+    icon.Parent = btn
 
-	local ownerTag = Instance.new("TextLabel")
-	ownerTag.BackgroundTransparency = 1
-	ownerTag.Position = UDim2.new(1,-80,0,10)
-	ownerTag.Size = UDim2.fromOffset(76,16)
-	ownerTag.Font = Enum.Font.GothamBold
-	ownerTag.TextSize = 12
-	ownerTag.TextColor3 = Color3.fromRGB(255,215,0)
-	ownerTag.Text = "⭐OWNER⭐"
-	ownerTag.Visible = false
-	ownerTag.Parent = btn
+    local name = Instance.new("TextLabel")
+    name.BackgroundTransparency = 1
+    name.Position = UDim2.fromOffset(38,0)
+    name.Size = UDim2.new(1,-40,1,0)
+    name.Font = Enum.Font.Gotham
+    name.TextSize = 14
+    name.TextXAlignment = Enum.TextXAlignment.Left
+    name.TextColor3 = Color3.fromRGB(235,235,235)
+    name.Text = player.DisplayName.." ("..player.Name..")"
+    name.Parent = btn
 
-	btn.MouseButton1Click:Connect(function()
-		executeOnPlayer(player)
-	end)
+    local ownerTag = Instance.new("TextLabel")
+    ownerTag.BackgroundTransparency = 1
+    ownerTag.Position = UDim2.new(1,-80,0,10)
+    ownerTag.Size = UDim2.fromOffset(76,16)
+    ownerTag.Font = Enum.Font.GothamBold
+    ownerTag.TextSize = 12
+    ownerTag.TextColor3 = Color3.fromRGB(255,215,0)
+    ownerTag.Text = "⭐OWNER⭐"
+    ownerTag.Visible = false
+    ownerTag.Parent = btn
 
-	playerButtons[player] = ownerTag
+    btn.MouseButton1Click:Connect(function()
+        executeOnPlayer(player)
+    end)
+
+    playerButtons[player] = ownerTag
 end
 
-local function refreshPlayers()
-	for _,c in ipairs(Scrolling:GetChildren()) do
-		if c:IsA("TextButton") then c:Destroy() end
-	end
-	playerButtons = {}
-	for _,p in ipairs(Players:GetPlayers()) do
-		if p ~= LocalPlayer then
-			createPlayerButton(p)
-		end
-	end
+-- Add all existing players once
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then
+        createPlayerButton(p)
+    end
 end
 
-Players.PlayerAdded:Connect(refreshPlayers)
-Players.PlayerRemoving:Connect(refreshPlayers)
-refreshPlayers()
+-- Only add buttons for new players
+Players.PlayerAdded:Connect(function(p)
+    if p ~= LocalPlayer then
+        createPlayerButton(p)
+    end
+end)
+
+-- Remove buttons when players leave
+Players.PlayerRemoving:Connect(function(p)
+    if playerButtons[p] then
+        local btn = playerButtons[p].Parent
+        if btn then btn:Destroy() end
+        playerButtons[p] = nil
+    end
+end)
 
 -- =========================
 -- NOTIFICATION LISTENER
