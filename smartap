@@ -1,0 +1,281 @@
+-- SMART AP v3 LocalScript
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
+
+if getgenv().__SMART_AP_LOADED__ then return end
+getgenv().__SMART_AP_LOADED__ = true
+
+-- Command cooldowns
+local COMMANDS = {rocket = 120, balloon = 30, ragdoll = 30}
+local lastUsed = {rocket = 0, balloon = 0, ragdoll = 0}
+
+-- GUI setup
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SMART_AP_GUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = CoreGui or LocalPlayer:WaitForChild("PlayerGui")
+
+local Frame = Instance.new("Frame")
+Frame.Name = "Root"
+Frame.Size = UDim2.fromOffset(300, 450)
+Frame.Position = UDim2.fromOffset(60, 150)
+Frame.BackgroundColor3 = Color3.fromRGB(18,18,18)
+Frame.BorderSizePixel = 0
+Frame.BackgroundTransparency = 0.08
+Frame.Parent = ScreenGui
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Thickness = 1
+UIStroke.Color = Color3.fromRGB(255,70,85)
+UIStroke.Transparency = 0.25
+UIStroke.Parent = Frame
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0,12)
+UICorner.Parent = Frame
+
+-- Top bar
+local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
+TopBar.Size = UDim2.new(1,0,0,36)
+TopBar.BackgroundColor3 = Color3.fromRGB(28,28,28)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = Frame
+
+local TopCorner = Instance.new("UICorner")
+TopCorner.CornerRadius = UDim.new(0,12)
+TopCorner.Parent = TopBar
+
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(1,-90,1,0)
+Title.Position = UDim2.fromOffset(12,0)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.TextColor3 = Color3.fromRGB(235,235,235)
+Title.Text = "SMART AP"
+Title.Parent = TopBar
+
+local RefreshButton = Instance.new("TextButton")
+RefreshButton.Text = "Refresh"
+RefreshButton.AutoButtonColor = true
+RefreshButton.Font = Enum.Font.Gotham
+RefreshButton.TextSize = 14
+RefreshButton.BackgroundColor3 = Color3.fromRGB(42,42,42)
+RefreshButton.TextColor3 = Color3.fromRGB(235,235,235)
+RefreshButton.Size = UDim2.fromOffset(80,26)
+RefreshButton.Position = UDim2.new(1,-86,0,5)
+RefreshButton.Parent = TopBar
+
+local RefreshCorner = Instance.new("UICorner")
+RefreshCorner.CornerRadius = UDim.new(0,8)
+RefreshCorner.Parent = RefreshButton
+
+-- Player list
+local Holder = Instance.new("Frame")
+Holder.Name = "Holder"
+Holder.BackgroundTransparency = 1
+Holder.Size = UDim2.new(1,-16,1,-100)
+Holder.Position = UDim2.fromOffset(8,44)
+Holder.Parent = Frame
+
+local Scrolling = Instance.new("ScrollingFrame")
+Scrolling.Name = "List"
+Scrolling.Active = true
+Scrolling.ScrollingDirection = Enum.ScrollingDirection.Y
+Scrolling.ScrollBarThickness = 6
+Scrolling.BackgroundTransparency = 1
+Scrolling.BorderSizePixel = 0
+Scrolling.Size = UDim2.new(1,0,1,0)
+Scrolling.CanvasSize = UDim2.fromOffset(0,0)
+Scrolling.Parent = Holder
+
+local ListLayout = Instance.new("UIListLayout")
+ListLayout.Padding = UDim.new(0,6)
+ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ListLayout.Parent = Scrolling
+
+local UIPadding = Instance.new("UIPadding")
+UIPadding.PaddingTop = UDim.new(0,4)
+UIPadding.PaddingLeft = UDim.new(0,2)
+UIPadding.PaddingRight = UDim.new(0,2)
+UIPadding.PaddingBottom = UDim.new(0,8)
+UIPadding.Parent = Scrolling
+
+-- Cooldowns section
+local CooldownsFrame = Instance.new("Frame")
+CooldownsFrame.Size = UDim2.new(1,-16,0,48)
+CooldownsFrame.Position = UDim2.fromOffset(8, Frame.Size.Y.Offset - 52)
+CooldownsFrame.BackgroundTransparency = 1
+CooldownsFrame.Parent = Frame
+
+local function createCooldownLabel(name, xOffset)
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.fromOffset(90,16)
+	lbl.Position = UDim2.fromOffset(xOffset,0)
+	lbl.BackgroundTransparency = 1
+	lbl.Font = Enum.Font.Gotham
+	lbl.TextSize = 14
+	lbl.TextColor3 = Color3.fromRGB(255,255,255)
+	lbl.Text = name..": 0s"
+	lbl.Parent = CooldownsFrame
+	return lbl
+end
+
+local cooldownLabels = {}
+cooldownLabels.rocket = createCooldownLabel("Rocket",0)
+cooldownLabels.balloon = createCooldownLabel("Balloon",100)
+cooldownLabels.ragdoll = createCooldownLabel("Ragdoll",200)
+
+-- Dragging
+local dragging, dragStartPos, startPos
+TopBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStartPos = input.Position
+		startPos = Frame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+TopBar.InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - dragStartPos
+		Frame.Position = UDim2.fromOffset(startPos.X.Offset + delta.X, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+-- Command execution
+local function executeCommand(player)
+	local available = {}
+	local now = tick()
+	for cmd, cd in pairs(COMMANDS) do
+		local elapsed = now - (lastUsed[cmd] or 0)
+		if elapsed >= cd then
+			table.insert(available, cmd)
+		end
+	end
+	local cmd
+	if #available > 0 then
+		cmd = available[math.random(1,#available)]
+	else
+		local cmdList = {"ragdoll","balloon","rocket"}
+		cmd = cmdList[math.random(1,#cmdList)]
+	end
+
+	lastUsed[cmd] = now
+
+	local remote = ReplicatedStorage:FindFirstChild("Packages")
+	if remote then
+		remote = remote:FindFirstChild("Net")
+		if remote then
+			remote = remote:FindFirstChild("RE/AdminPanelService/ExecuteCommand")
+			if remote and remote:IsA("RemoteEvent") then
+				pcall(function()
+					remote:FireServer(player, cmd)
+				end)
+			end
+		end
+	end
+end
+
+-- Cooldown display update
+RunService.RenderStepped:Connect(function()
+	local now = tick()
+	for cmd, cd in pairs(COMMANDS) do
+		local last = lastUsed[cmd] or 0
+		local remaining = math.max(0, cd - (now - last))
+		cooldownLabels[cmd].Text = cmd:sub(1,1):upper()..cmd:sub(2)..": "..math.floor(remaining).."s"
+	end
+end)
+
+-- Player button creation
+local function createPlayerButton(player)
+	local btn = Instance.new("TextButton")
+	btn.Name = "P_"..player.UserId
+	btn.Size = UDim2.new(1,-6,0,34)
+	btn.BackgroundColor3 = Color3.fromRGB(38,38,38)
+	btn.Text = ""
+	btn.AutoButtonColor = true
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0,8)
+	corner.Parent = btn
+
+	-- Icon
+	local icon = Instance.new("ImageLabel")
+	icon.Size = UDim2.fromOffset(28,28)
+	icon.Position = UDim2.fromOffset(4,3)
+	icon.BackgroundTransparency = 1
+	icon.Image = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+	icon.Parent = btn
+
+	-- Name
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.new(1,-36,1,0)
+	nameLabel.Position = UDim2.fromOffset(36,0)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Font = Enum.Font.Gotham
+	nameLabel.TextSize = 14
+	nameLabel.TextColor3 = Color3.fromRGB(235,235,235)
+	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+	nameLabel.Text = player.DisplayName.." ("..player.Name..")"
+	nameLabel.Parent = btn
+
+	-- Stealing indicator
+	local stealLabel = Instance.new("TextLabel")
+	stealLabel.Size = UDim2.fromOffset(60,16)
+	stealLabel.Position = UDim2.new(1, -65,0,9)
+	stealLabel.BackgroundTransparency = 1
+	stealLabel.Font = Enum.Font.GothamBold
+	stealLabel.TextSize = 12
+	stealLabel.TextColor3 = Color3.fromRGB(255,0,0)
+	stealLabel.Text = "STEALING"
+	stealLabel.Visible = false
+	stealLabel.Parent = btn
+
+	RunService.RenderStepped:Connect(function()
+		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			local stealing = false
+			for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+				local animId = tonumber(track.Animation.AnimationId:match("%d+"))
+				if animId == 71186871415348 then
+					stealing = true
+					break
+				end
+			end
+			stealLabel.Visible = stealing
+		end
+	end)
+
+	btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(48,48,48) end)
+	btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(38,38,38) end)
+	btn.Activated:Connect(function() executeCommand(player) end)
+	btn.Parent = Scrolling
+end
+
+local function updatePlayerList()
+	for _, child in pairs(Scrolling:GetChildren()) do
+		if child:IsA("TextButton") then child:Destroy() end
+	end
+	for _, p in pairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer and p.Name ~= "jihallzb790" then
+			createPlayerButton(p)
+		end
+	end
+end
+
+RefreshButton.MouseButton1Click:Connect(updatePlayerList)
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(updatePlayerList)
+updatePlayerList()
