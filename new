@@ -210,4 +210,194 @@ _G.antiLagConn = player.CharacterAdded:Connect(function()
 end)
 
 
+-- Player ESP LocalScript with top-of-head STEALING detection
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local ESPFolder = Instance.new("Folder")
+ESPFolder.Name = "ESPFolder"
+ESPFolder.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local Colors = {
+    Color3.fromRGB(255,0,0),    -- Red
+    Color3.fromRGB(255,165,0),  -- Orange
+    Color3.fromRGB(255,255,0),  -- Yellow
+    Color3.fromRGB(0,255,0),    -- Green
+    Color3.fromRGB(0,0,255),    -- Blue
+    Color3.fromRGB(128,0,128),  -- Purple
+    Color3.fromRGB(0,255,255),  -- Cyan
+    Color3.fromRGB(165,42,42),  -- Brown
+}
+
+local R15Parts = {
+    "Head","UpperTorso","LowerTorso",
+    "LeftFoot","LeftLowerLeg","LeftUpperLeg",
+    "RightFoot","RightLowerLeg","RightUpperLeg",
+    "LeftHand","LeftLowerArm","LeftUpperArm",
+    "RightHand","RightLowerArm","RightUpperArm"
+}
+
+local STEALING_ANIMATION = 71186871415348
+
+local function getPlayerColor(player)
+    return Colors[(player.UserId % #Colors) + 1]
+end
+
+local function createNameBillboard(player, head)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "NameBillboard"
+    billboard.Adornee = head
+    billboard.Size = UDim2.new(0,150,0,50)
+    billboard.StudsOffset = Vector3.new(0,2,0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = ESPFolder
+
+    local usernameLabel = Instance.new("TextLabel")
+    usernameLabel.Size = UDim2.new(1,0,0.5,0)
+    usernameLabel.Position = UDim2.new(0,0,0,0)
+    usernameLabel.BackgroundTransparency = 1
+    usernameLabel.Text = player.Name
+    usernameLabel.TextColor3 = getPlayerColor(player)
+    usernameLabel.TextStrokeTransparency = 0
+    usernameLabel.Font = Enum.Font.SourceSansBold
+    usernameLabel.TextSize = 18
+    usernameLabel.Parent = billboard
+
+    local displayLabel = Instance.new("TextLabel")
+    displayLabel.Size = UDim2.new(1,0,0.5,0)
+    displayLabel.Position = UDim2.new(0,0,0.5,0)
+    displayLabel.BackgroundTransparency = 1
+    displayLabel.Text = "("..player.DisplayName..")"
+    displayLabel.TextColor3 = getPlayerColor(player)
+    displayLabel.TextStrokeTransparency = 0
+    displayLabel.Font = Enum.Font.SourceSansBold
+    displayLabel.TextSize = 18
+    displayLabel.Parent = billboard
+end
+
+local function createStealingBillboard(head)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "StealingBillboard"
+    billboard.Adornee = head
+    billboard.Size = UDim2.new(0,200,0,50)
+    billboard.StudsOffset = Vector3.new(0,3,0) -- higher than name
+    billboard.AlwaysOnTop = true
+    billboard.Parent = ESPFolder
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1,0,1,0)
+    label.Position = UDim2.new(0,0,0,0)
+    label.BackgroundTransparency = 1
+    label.Text = "🔴 STEALING 🔴"
+    label.TextColor3 = Color3.fromRGB(255,0,0)
+    label.TextStrokeTransparency = 0
+    label.Font = Enum.Font.SourceSansBold
+    label.TextSize = 24
+    label.Visible = false
+    label.Parent = billboard
+
+    return label
+end
+
+local function applyESP(player)
+    if player == LocalPlayer then return end
+    local character = player.Character
+    if not character then return end
+
+    -- Highlight
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ESPHighlight"
+    highlight.Adornee = character
+    highlight.FillColor = getPlayerColor(player)
+    highlight.OutlineColor = Color3.new(0,0,0)
+    highlight.Parent = ESPFolder
+
+    -- Head references
+    local head = character:FindFirstChild("Head")
+    if not head then return end
+
+    -- Billboards
+    createNameBillboard(player, head)
+    local stealingLabel = createStealingBillboard(head)
+
+    -- Force transparency
+    local function fixTransparency()
+        if not character.Parent then return end
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") and part.Name ~= "__HITBOX" then
+                part.Transparency = 0
+            end
+        end
+        for _, name in pairs(R15Parts) do
+            local part = character:FindFirstChild(name)
+            if part and part:IsA("BasePart") then
+                part.Transparency = 0
+            end
+        end
+    end
+    fixTransparency()
+    local transparencyConnection = RunService.RenderStepped:Connect(fixTransparency)
+
+    -- Stealing detection
+    local function updateStealing()
+        if not character.Parent then return end
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid and stealingLabel then
+            local isStealing = false
+            for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+                local animIdNum = tonumber(track.Animation.AnimationId:match("%d+"))
+                if animIdNum == STEALING_ANIMATION then
+                    isStealing = true
+                    break
+                end
+            end
+            stealingLabel.Visible = isStealing
+        end
+    end
+    local stealingConnection = RunService.RenderStepped:Connect(updateStealing)
+
+    -- Cleanup on death
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.Died:Connect(function()
+            highlight:Destroy()
+            local nameBB = ESPFolder:FindFirstChild("NameBillboard")
+            if nameBB then nameBB:Destroy() end
+            local stealBB = ESPFolder:FindFirstChild("StealingBillboard")
+            if stealBB then stealBB:Destroy() end
+            transparencyConnection:Disconnect()
+            stealingConnection:Disconnect()
+        end)
+    end
+end
+
+-- Initial setup
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        player.CharacterAdded:Connect(function()
+            wait(0.1)
+            applyESP(player)
+        end)
+        if player.Character then
+            applyESP(player)
+        end
+    end
+end
+
+-- New players
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then
+        player.CharacterAdded:Connect(function()
+            wait(0.1)
+            applyESP(player)
+        end)
+        if player.Character then
+            applyESP(player)
+        end
+    end
+end)
+
+
+
 print("✅ Easy Hub loaded")
