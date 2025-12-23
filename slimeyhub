@@ -210,14 +210,14 @@ _G.antiLagConn = player.CharacterAdded:Connect(function()
 end)
 
 
--- Lightweight Optimized Player ESP System (with Colored Username + R15 Anti-Invis)
+-- Lightweight Optimized Player ESP System (Fixed: No More All-Red + Bigger Text + Username Format)
 -- Paste into any LocalScript
--- • Randomized consistent color per player (8 main colors)
+-- • Deterministic color per player (UserId-based, spreads evenly)
 -- • Highlight on entire character
--- • Billboard username above head (same color, stroke for visibility)
+-- • Bigger Billboard: Username top, (DisplayName) below — middle-sized TextScaled
 -- • Forces Transparency=0 on ALL BaseParts except __HITBOX (counters invis cloaks)
 -- • Explicit R15 parts enforced every ~0.16s (low-lag global loop)
--- • Super optimized: minimal connections, no per-player loops
+-- • Super optimized: minimal connections, no RNG issues
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -245,6 +245,12 @@ local R15_PARTS = {
 local playerData = {}  -- [player] = {highlight, billboard}
 local playerColor = {} -- [player] = Color3
 
+-- FIXED: Deterministic color (no randomseed issues, even spread)
+local function getPlayerColor(player)
+    local index = (player.UserId % #COLORS) + 1
+    return COLORS[index]
+end
+
 -- Global low-lag enforcer (every ~0.16s, only R15 parts)
 local frameCount = 0
 local enforcer = RunService.Stepped:Connect(function()
@@ -268,10 +274,9 @@ end)
 local function setupESP(player)
     if player == LocalPlayer then return end
     
-    -- Consistent random color (seeded by UserId)
+    -- FIXED: Use deterministic color
     if not playerColor[player] then
-        math.randomseed(player.UserId)
-        playerColor[player] = COLORS[math.random(#COLORS)]
+        playerColor[player] = getPlayerColor(player)
     end
     local color = playerColor[player]
     
@@ -301,13 +306,13 @@ local function setupESP(player)
             end
         end
         
-        -- New BillboardGui (username above head)
+        -- New BillboardGui (username above head - BIGGER/MIDDLE SIZE)
         local head = char:WaitForChild("Head")
         data.billboard = Instance.new("BillboardGui")
         data.billboard.Name = "ESPNameGui"
         data.billboard.Adornee = head
-        data.billboard.Size = UDim2.new(0, 300, 0, 60)
-        data.billboard.StudsOffset = Vector3.new(0, 3, 0)
+        data.billboard.Size = UDim2.new(0, 350, 0, 80)  -- Bigger for middle-sized text
+        data.billboard.StudsOffset = Vector3.new(0, 3.5, 0)
         data.billboard.Parent = head
         data.billboard.AlwaysOnTop = true
         data.billboard.LightInfluence = 0
@@ -316,12 +321,12 @@ local function setupESP(player)
         textLabel.Name = "NameLabel"
         textLabel.Size = UDim2.new(1, 0, 1, 0)
         textLabel.BackgroundTransparency = 1
-        textLabel.Text = player.DisplayName .. "\n(" .. player.Name .. ")"
+        textLabel.Text = player.Name .. "\n(" .. player.DisplayName .. ")"  -- FIXED: Username top, Display in ()
         textLabel.TextColor3 = color
         textLabel.TextStrokeTransparency = 0
         textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
         textLabel.Font = Enum.Font.GothamBold
-        textLabel.TextScaled = true
+        textLabel.TextScaled = true  -- Auto middle-size on bigger canvas
         textLabel.Parent = data.billboard
         
         -- New parts: force visible
@@ -365,7 +370,7 @@ LocalPlayer.AncestryChanged:Connect(function()
     cleanupPlayer(LocalPlayer)
 end)
 
-print("Enhanced ESP loaded! Colored usernames + full R15 anti-invis + highlights.")
+print("Fixed ESP reloaded! Varied colors + bigger middle text + Username (DisplayName)")
 
 
 
