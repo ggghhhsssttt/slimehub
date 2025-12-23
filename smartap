@@ -358,10 +358,8 @@ for plr, ownerTag in pairs(playerButtons) do
 
 		if ownerDisplay and plr.DisplayName == ownerDisplay then
 			ownerTag.Visible = true
-			refreshPlayers()
 		else
 			ownerTag.Visible = false
-			refreshPlayers()
 		end
 
 		if isPlayerStealing(plr) then
