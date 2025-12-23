@@ -210,6 +210,118 @@ _G.antiLagConn = player.CharacterAdded:Connect(function()
 end)
 
 
+------------------------------------------------
+-- PERMANENT PLAYER ESP (LIGHTWEIGHT)
+------------------------------------------------
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Storage
+local espObjects = {}
+local playerColors = {}
+
+-- Random but readable color
+local function getRandomColor()
+	return Color3.fromHSV(
+		math.random(),
+		0.8,
+		1
+	)
+end
+
+------------------------------------------------
+-- CREATE ESP FOR PLAYER
+------------------------------------------------
+local function createESP(player)
+	if player == LocalPlayer then return end
+	if espObjects[player] then return end
+
+	local function apply(character)
+		if not character then return end
+		local humanoidRoot = character:WaitForChild("HumanoidRootPart", 5)
+		local head = character:WaitForChild("Head", 5)
+		if not humanoidRoot or not head then return end
+
+		-- Cache color
+		if not playerColors[player] then
+			playerColors[player] = getRandomColor()
+		end
+		local color = playerColors[player]
+
+		-- Highlight (ESP body)
+		local highlight = Instance.new("Highlight")
+		highlight.Name = "SlimeyESP"
+		highlight.Adornee = character
+		highlight.FillColor = color
+		highlight.OutlineColor = color
+		highlight.FillTransparency = 0.55
+		highlight.OutlineTransparency = 0
+		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		highlight.Parent = character
+
+		-- Username tag
+		local billboard = Instance.new("BillboardGui")
+		billboard.Name = "SlimeyNameESP"
+		billboard.Adornee = head
+		billboard.Size = UDim2.fromOffset(200, 40)
+		billboard.StudsOffset = Vector3.new(0, 2.8, 0)
+		billboard.AlwaysOnTop = true
+		billboard.Parent = head
+
+		local text = Instance.new("TextLabel", billboard)
+		text.Size = UDim2.fromScale(1, 1)
+		text.BackgroundTransparency = 1
+		text.Text = player.Name
+		text.Font = Enum.Font.GothamBold
+		text.TextSize = 16
+		text.TextColor3 = color
+		text.TextStrokeTransparency = 0.3
+		text.TextScaled = false
+
+		espObjects[player] = {
+			highlight = highlight,
+			billboard = billboard
+		}
+	end
+
+	-- Character handling
+	if player.Character then
+		apply(player.Character)
+	end
+
+	player.CharacterAdded:Connect(function(char)
+		task.wait(0.5)
+		apply(char)
+	end)
+end
+
+------------------------------------------------
+-- REMOVE ESP
+------------------------------------------------
+local function removeESP(player)
+	local data = espObjects[player]
+	if data then
+		pcall(function()
+			if data.highlight then data.highlight:Destroy() end
+			if data.billboard then data.billboard:Destroy() end
+		end)
+	end
+	espObjects[player] = nil
+	playerColors[player] = nil
+end
+
+------------------------------------------------
+-- INITIALIZE
+------------------------------------------------
+for _, plr in ipairs(Players:GetPlayers()) do
+	createESP(plr)
+end
+
+Players.PlayerAdded:Connect(createESP)
+Players.PlayerRemoving:Connect(removeESP)
+
+print("👁️ Slimey ESP enabled (lightweight & permanent)")
+
 
 
 print("✅ Easy Hub loaded")
