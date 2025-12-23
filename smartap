@@ -203,6 +203,7 @@ local function fireCommand(player, cmd)
 	if re then
 		pcall(function()
 			re:FireServer(player, cmd)
+			lastUsed[cmd] = os.clock()
 		end)
 	end
 end
