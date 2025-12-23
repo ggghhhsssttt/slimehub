@@ -211,116 +211,137 @@ end)
 
 
 ------------------------------------------------
--- PERMANENT PLAYER ESP (LIGHTWEIGHT)
+-- PERMANENT PLAYER ESP (INVISIBLE-SAFE)
 ------------------------------------------------
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- Storage
-local espObjects = {}
-local playerColors = {}
+local espCache = {}
+local colorCache = {}
 
--- Random but readable color
-local function getRandomColor()
-	return Color3.fromHSV(
-		math.random(),
-		0.8,
-		1
-	)
+------------------------------------------------
+-- UTIL
+------------------------------------------------
+local function randomColor()
+	return Color3.fromHSV(math.random(), 0.85, 1)
 end
 
 ------------------------------------------------
--- CREATE ESP FOR PLAYER
+-- APPLY ESP
 ------------------------------------------------
-local function createESP(player)
+local function applyESP(player, character)
 	if player == LocalPlayer then return end
-	if espObjects[player] then return end
+	if not character then return end
 
-	local function apply(character)
-		if not character then return end
-		local humanoidRoot = character:WaitForChild("HumanoidRootPart", 5)
-		local head = character:WaitForChild("Head", 5)
-		if not humanoidRoot or not head then return end
+	-- Cache color per player
+	if not colorCache[player] then
+		colorCache[player] = randomColor()
+	end
+	local color = colorCache[player]
 
-		-- Cache color
-		if not playerColors[player] then
-			playerColors[player] = getRandomColor()
+	-- Remove old ESP if exists
+	if espCache[player] then
+		for _, obj in pairs(espCache[player]) do
+			pcall(function() obj:Destroy() end)
 		end
-		local color = playerColors[player]
+	end
 
-		-- Highlight (ESP body)
-		local highlight = Instance.new("Highlight")
-		highlight.Name = "SlimeyESP"
-		highlight.Adornee = character
-		highlight.FillColor = color
-		highlight.OutlineColor = color
-		highlight.FillTransparency = 0.55
-		highlight.OutlineTransparency = 0
-		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-		highlight.Parent = character
+	------------------------------------------------
+	-- HIGHLIGHT (WORKS EVEN IF INVISIBLE)
+	------------------------------------------------
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "SlimeyESP"
+	highlight.Adornee = character
+	highlight.FillColor = color
+	highlight.OutlineColor = color
 
-		-- Username tag
+	-- FORCE BOTH FILL + OUTLINE
+	highlight.FillTransparency = 0.45
+	highlight.OutlineTransparency = 0
+
+	-- SEE THROUGH WALLS + INVIS
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Enabled = true
+	highlight.Parent = character
+
+	------------------------------------------------
+	-- NAME TAG (ALWAYS VISIBLE)
+	------------------------------------------------
+	local head =
+		character:FindFirstChild("Head")
+		or character:FindFirstChildWhichIsA("BasePart")
+
+	if head then
 		local billboard = Instance.new("BillboardGui")
 		billboard.Name = "SlimeyNameESP"
 		billboard.Adornee = head
 		billboard.Size = UDim2.fromOffset(200, 40)
-		billboard.StudsOffset = Vector3.new(0, 2.8, 0)
+		billboard.StudsOffset = Vector3.new(0, 3, 0)
 		billboard.AlwaysOnTop = true
 		billboard.Parent = head
 
-		local text = Instance.new("TextLabel", billboard)
+		local text = Instance.new("TextLabel")
 		text.Size = UDim2.fromScale(1, 1)
 		text.BackgroundTransparency = 1
 		text.Text = player.Name
 		text.Font = Enum.Font.GothamBold
 		text.TextSize = 16
 		text.TextColor3 = color
-		text.TextStrokeTransparency = 0.3
-		text.TextScaled = false
+		text.TextStrokeTransparency = 0.25
+		text.TextXAlignment = Enum.TextXAlignment.Center
+		text.TextYAlignment = Enum.TextYAlignment.Center
+		text.Parent = billboard
 
-		espObjects[player] = {
-			highlight = highlight,
-			billboard = billboard
+		espCache[player] = {
+			Highlight = highlight,
+			Billboard = billboard
+		}
+	else
+		espCache[player] = {
+			Highlight = highlight
 		}
 	end
+end
 
-	-- Character handling
+------------------------------------------------
+-- PLAYER HANDLING
+------------------------------------------------
+local function setupPlayer(player)
+	if player == LocalPlayer then return end
+
+	local function onChar(char)
+		task.wait(0.4)
+		applyESP(player, char)
+	end
+
 	if player.Character then
-		apply(player.Character)
+		onChar(player.Character)
 	end
 
-	player.CharacterAdded:Connect(function(char)
-		task.wait(0.5)
-		apply(char)
-	end)
+	player.CharacterAdded:Connect(onChar)
+end
+
+local function cleanupPlayer(player)
+	if espCache[player] then
+		for _, obj in pairs(espCache[player]) do
+			pcall(function() obj:Destroy() end)
+		end
+	end
+	espCache[player] = nil
+	colorCache[player] = nil
 end
 
 ------------------------------------------------
--- REMOVE ESP
-------------------------------------------------
-local function removeESP(player)
-	local data = espObjects[player]
-	if data then
-		pcall(function()
-			if data.highlight then data.highlight:Destroy() end
-			if data.billboard then data.billboard:Destroy() end
-		end)
-	end
-	espObjects[player] = nil
-	playerColors[player] = nil
-end
-
-------------------------------------------------
--- INITIALIZE
+-- INIT
 ------------------------------------------------
 for _, plr in ipairs(Players:GetPlayers()) do
-	createESP(plr)
+	setupPlayer(plr)
 end
 
-Players.PlayerAdded:Connect(createESP)
-Players.PlayerRemoving:Connect(removeESP)
+Players.PlayerAdded:Connect(setupPlayer)
+Players.PlayerRemoving:Connect(cleanupPlayer)
 
-print("👁️ Slimey ESP enabled (lightweight & permanent)")
+print("👁️ Slimey ESP active (fill + outline, invis-safe)")
 
 
 
