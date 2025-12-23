@@ -211,12 +211,10 @@ end)
 
 
 ------------------------------------------------
--- SLIMEY HUB ESP - OUTLINE + FILL (INVIS SAFE)
+-- SLIMEY HUB ESP - R15 SAFE
 ------------------------------------------------
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-
 local espCache = {}
 local colorCache = {}
 
@@ -225,7 +223,6 @@ local function randomColor()
 	return Color3.fromHSV(math.random(), 0.85, 1)
 end
 
--- Apply ESP to a character
 local function applyESP(player, character)
 	if player == LocalPlayer then return end
 	if not character then return end
@@ -238,30 +235,23 @@ local function applyESP(player, character)
 
 	-- Cleanup old ESP
 	if espCache[player] then
-		for _, obj in pairs(espCache[player]) do
-			pcall(function() obj:Destroy() end)
-		end
+		pcall(function() espCache[player]:Destroy() end)
 	end
-	espCache[player] = {}
 
-	-- Create highlight for each BasePart
-	for _, part in pairs(character:GetDescendants()) do
-		if part:IsA("BasePart") then
-			local hl = Instance.new("Highlight")
-			hl.Name = "SlimeyESP"
-			hl.Adornee = part
-			hl.FillColor = color
-			hl.OutlineColor = color
-			hl.FillTransparency = 0.45
-			hl.OutlineTransparency = 0
-			hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-			hl.Parent = part
-			table.insert(espCache[player], hl)
-		end
-	end
+	-- Create single Highlight for the character model
+	local hl = Instance.new("Highlight")
+	hl.Name = "SlimeyESP"
+	hl.Adornee = character
+	hl.FillColor = color
+	hl.OutlineColor = color
+	hl.FillTransparency = 0.45
+	hl.OutlineTransparency = 0
+	hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	hl.Parent = character
+	espCache[player] = hl
 
 	-- Name tag above head
-	local head = character:FindFirstChild("Head") or character:FindFirstChildWhichIsA("BasePart")
+	local head = character:FindFirstChild("Head")
 	if head then
 		local billboard = Instance.new("BillboardGui")
 		billboard.Name = "SlimeyNameESP"
@@ -282,25 +272,7 @@ local function applyESP(player, character)
 		text.TextXAlignment = Enum.TextXAlignment.Center
 		text.TextYAlignment = Enum.TextYAlignment.Center
 		text.Parent = billboard
-
-		table.insert(espCache[player], billboard)
 	end
-
-	-- Watch for new parts added to the character (in case of accessories or R15 rebuilds)
-	character.DescendantAdded:Connect(function(desc)
-		if desc:IsA("BasePart") then
-			local hl = Instance.new("Highlight")
-			hl.Name = "SlimeyESP"
-			hl.Adornee = desc
-			hl.FillColor = color
-			hl.OutlineColor = color
-			hl.FillTransparency = 0.45
-			hl.OutlineTransparency = 0
-			hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-			hl.Parent = desc
-			table.insert(espCache[player], hl)
-		end
-	end)
 end
 
 -- Setup a new player
@@ -308,7 +280,7 @@ local function setupPlayer(player)
 	if player == LocalPlayer then return end
 
 	local function onChar(char)
-		task.wait(0.4)
+		task.wait(0.1)
 		applyESP(player, char)
 	end
 
@@ -322,15 +294,13 @@ end
 -- Cleanup player leaving
 local function cleanupPlayer(player)
 	if espCache[player] then
-		for _, obj in pairs(espCache[player]) do
-			pcall(function() obj:Destroy() end)
-		end
+		pcall(function() espCache[player]:Destroy() end)
 	end
 	espCache[player] = nil
 	colorCache[player] = nil
 end
 
--- Initialize for existing players
+-- Initialize existing players
 for _, plr in ipairs(Players:GetPlayers()) do
 	setupPlayer(plr)
 end
@@ -338,7 +308,7 @@ end
 Players.PlayerAdded:Connect(setupPlayer)
 Players.PlayerRemoving:Connect(cleanupPlayer)
 
-print("👁️ Slimey ESP active (fill + outline, invis-safe)")
+print("👁️ Slimey ESP active (R15 safe, fill + outline)")
 
 
 
