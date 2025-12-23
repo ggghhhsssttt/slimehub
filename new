@@ -1,0 +1,213 @@
+-- EASY HUB
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local RS = RunService
+
+------------------------------------------------
+-- GUI
+------------------------------------------------
+local gui = Instance.new("ScreenGui")
+gui.Name = "EasyHub"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.fromOffset(200, 160)
+frame.Position = UDim2.new(0, 20, 0.5, -80)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,35)
+frame.Active = true
+frame.Draggable = true
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0,10)
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,32)
+title.BackgroundTransparency = 1
+title.Text = "slimey hub"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 20
+title.TextColor3 = Color3.new(1,1,1)
+
+------------------------------------------------
+-- BUTTON CREATOR
+------------------------------------------------
+local function makeButton(text, y)
+    local b = Instance.new("TextButton", frame)
+    b.Size = UDim2.new(1,-20,0,36)
+    b.Position = UDim2.new(0,10,0,y)
+    b.Text = text
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 16
+    b.TextColor3 = Color3.new(1,1,1)
+    b.BackgroundColor3 = Color3.fromRGB(120,80,80)
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0,8)
+    return b
+end
+
+------------------------------------------------
+-- BUTTONS
+------------------------------------------------
+local flasherBtn = makeButton("Flasher [OFF]", 42)
+local kickBtn    = makeButton("Auto Kick [OFF]", 82)
+local camBtn     = makeButton("Ghost Cam [ON]", 122)
+
+------------------------------------------------
+-- STATES
+------------------------------------------------
+local flasher = false
+local autoKick = false
+local ghostCam = true -- default ON
+
+------------------------------------------------
+-- FLASHER
+------------------------------------------------
+flasherBtn.MouseButton1Click:Connect(function()
+    flasher = not flasher
+
+    flasherBtn.Text = flasher and "Flasher [ON]" or "Flasher [OFF]"
+    flasherBtn.BackgroundColor3 = flasher and Color3.fromRGB(80,160,80) or Color3.fromRGB(120,80,80)
+
+    if _G.flasherTrack then _G.flasherTrack:Stop(); _G.flasherTrack = nil end
+    if _G.flasherConn then _G.flasherConn:Disconnect(); _G.flasherConn = nil end
+
+    if not flasher then
+        local char = player.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                for _, t in pairs(hum:GetPlayingAnimationTracks()) do t:Stop() end
+                hum:ChangeState(Enum.HumanoidStateType.Running)
+            end
+        end
+        return
+    end
+
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hum = char:WaitForChild("Humanoid")
+    local animator = hum:FindFirstChildOfClass("Animator")
+
+    local anim = Instance.new("Animation")
+    anim.AnimationId = "rbxassetid://77840765435893"
+
+    _G.flasherTrack = animator:LoadAnimation(anim)
+    _G.flasherTrack.Priority = Enum.AnimationPriority.Core
+    _G.flasherTrack:Play()
+
+    _G.flasherConn = RS.Heartbeat:Connect(function()
+        if hum.Health <= 0 then return end
+        if not _G.flasherTrack.IsPlaying then
+            _G.flasherTrack:Play()
+        end
+        for _, t in pairs(hum:GetPlayingAnimationTracks()) do
+            if t ~= _G.flasherTrack then t:Stop() end
+        end
+    end)
+end)
+
+------------------------------------------------
+-- AUTO KICK
+------------------------------------------------
+kickBtn.MouseButton1Click:Connect(function()
+    autoKick = not autoKick
+
+    kickBtn.Text = autoKick and "Auto Kick [ON]" or "Auto Kick [OFF]"
+    kickBtn.BackgroundColor3 = autoKick and Color3.fromRGB(80,160,80) or Color3.fromRGB(120,80,80)
+
+    if _G.brainrotConn then
+        _G.brainrotConn:Disconnect()
+        _G.brainrotConn = nil
+    end
+
+    if not autoKick then return end
+
+    local pg = player:FindFirstChild("PlayerGui")
+    if not pg then return end
+
+    local notifOuter = pg:FindFirstChild("Notification")
+    local notifFolder = notifOuter and notifOuter:FindFirstChild("Notification")
+    if not notifFolder then return end
+
+    _G.brainrotConn = notifFolder.ChildAdded:Connect(function(child)
+        if child:IsA("TextLabel") then
+            task.wait(0)
+            local txt = child.Text or ""
+            if txt:match("^You stole") and txt:find("<stroke") and txt:find("<font") then
+                player:Kick("fuwatti skid ON TOP")
+            end
+        end
+    end)
+end)
+
+------------------------------------------------
+-- GHOST CAM (DEFAULT ON)
+------------------------------------------------
+local camConn
+local function applyGhostCam()
+    if camConn then camConn:Disconnect() end
+    if not ghostCam then
+        player.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Zoom
+        return
+    end
+    camConn = RunService.RenderStepped:Connect(function()
+        player.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Invisicam
+    end)
+end
+
+camBtn.MouseButton1Click:Connect(function()
+    ghostCam = not ghostCam
+    camBtn.Text = ghostCam and "Ghost Cam [ON]" or "Ghost Cam [OFF]"
+    camBtn.BackgroundColor3 = ghostCam and Color3.fromRGB(80,160,80) or Color3.fromRGB(120,80,80)
+    applyGhostCam()
+end)
+
+applyGhostCam()
+
+-- === ANTI LAG / ANTI FLASH ALWAYS ON ===
+local player = game.Players.LocalPlayer
+
+-- Function to strip accessories/clothing from a humanoid
+local function stripHumanoid(hum)
+    local char = hum.Parent
+    if not char then return end
+    for _, obj in ipairs(char:GetDescendants()) do
+        if obj:IsA("Accessory") or obj:IsA("LayeredClothing") or obj:IsA("Clothing") then
+            pcall(function() obj:Destroy() end)
+        end
+    end
+end
+
+-- Function to strip all humanoids in the workspace
+local function stripAll()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Humanoid") then
+            stripHumanoid(obj)
+        end
+    end
+end
+
+-- Run once immediately
+stripAll()
+
+-- Connect to new descendants
+_G.antiLagDescConn = workspace.DescendantAdded:Connect(function(obj)
+    if obj:IsA("Humanoid") then
+        task.wait(0.5)
+        stripHumanoid(obj)
+    elseif (obj:IsA("Accessory") or obj:IsA("LayeredClothing"))
+        and obj.Parent and obj.Parent:FindFirstChildOfClass("Humanoid") then
+        task.delay(0.1, function()
+            pcall(function() obj:Destroy() end)
+        end)
+    end
+end)
+
+-- Connect to player respawn
+_G.antiLagConn = player.CharacterAdded:Connect(function()
+    task.wait(1)
+    stripAll()
+end)
+
+
+print("✅ Easy Hub loaded")
