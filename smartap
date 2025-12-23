@@ -1,4 +1,4 @@
--- SMART AP v5 LocalScript
+--SMART AP V6 PROBABLY FINAL CUZ ITS GOATED
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -54,22 +54,6 @@ TopBar.Size = UDim2.new(1,0,0,36)
 TopBar.BackgroundColor3 = Color3.fromRGB(28,28,28)
 TopBar.Parent = Frame
 Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0,12)
-
-local RefreshBtn = Instance.new("TextButton")
-RefreshBtn.Size = UDim2.fromOffset(90, 26)
-RefreshBtn.Position = UDim2.new(1, -212, 0, 5)
-RefreshBtn.Font = Enum.Font.GothamBold
-RefreshBtn.TextSize = 13
-RefreshBtn.TextColor3 = Color3.fromRGB(255,255,255)
-RefreshBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-RefreshBtn.Text = "REFRESH"
-RefreshBtn.Parent = TopBar
-Instance.new("UICorner", RefreshBtn).CornerRadius = UDim.new(0,8)
-
-RefreshBtn.MouseButton1Click:Connect(function()
-	refreshPlayers()
-end)
-
 
 -- DRAGGING LOGIC
 do
@@ -134,6 +118,23 @@ SpamBtn.MouseButton1Click:Connect(function()
 	SpamBtn.Text = "SPAM ALL: "..(SpamAll and "ON" or "OFF")
 	SpamBtn.BackgroundColor3 = SpamAll and Color3.fromRGB(180,60,60) or Color3.fromRGB(60,60,60)
 end)
+
+-- REFRESH BUTTON
+local RefreshBtn = Instance.new("TextButton")
+RefreshBtn.Size = UDim2.fromOffset(90, 26)
+RefreshBtn.Position = UDim2.new(1, -212, 0, 5) -- next to SPAM ALL
+RefreshBtn.Font = Enum.Font.GothamBold
+RefreshBtn.TextSize = 13
+RefreshBtn.TextColor3 = Color3.fromRGB(255,255,255)
+RefreshBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+RefreshBtn.Text = "REFRESH"
+RefreshBtn.Parent = TopBar
+Instance.new("UICorner", RefreshBtn).CornerRadius = UDim.new(0,8)
+
+RefreshBtn.MouseButton1Click:Connect(function()
+	refreshPlayers()
+end)
+
 
 -- =========================
 -- PLAYER LIST
@@ -203,7 +204,6 @@ local function fireCommand(player, cmd)
 	if re then
 		pcall(function()
 			re:FireServer(player, cmd)
-			lastUsed[cmd] = os.clock()
 		end)
 	end
 end
@@ -363,29 +363,36 @@ task.spawn(function()
 	while true do
 		local now = os.clock()
 		local ownerDisplay = getNearbyPlotOwner()
+
+		-- update cooldowns
 		for cmd, cd in pairs(COMMANDS) do
 			local remaining = math.max(0, math.ceil(cd - (now - lastUsed[cmd])))
 			local prefix = enabledCommands[cmd] and "☑ " or "☐ "
 			cooldownLabels[cmd].Text = prefix..cmd..": "..remaining.."s"
 		end
-for plr, ownerTag in pairs(playerButtons) do
-	local nameLabel = ownerTag.Parent:FindFirstChildOfClass("TextLabel")
-	if nameLabel then
-		local text = plr.Name.." ("..plr.DisplayName..")"
 
-		if ownerDisplay and plr.DisplayName == ownerDisplay then
-			ownerTag.Visible = true
-		else
-			ownerTag.Visible = false
+		-- update player buttons
+		for plr, ownerTag in pairs(playerButtons) do
+			local nameLabel = ownerTag.Parent:FindFirstChildOfClass("TextLabel")
+			if nameLabel then
+				local text = plr.Name.." ("..plr.DisplayName..")" -- base text
+
+				-- owner tag
+				if ownerDisplay and plr.DisplayName == ownerDisplay then
+					ownerTag.Visible = true
+				else
+					ownerTag.Visible = false
+				end
+
+				-- stealing tag
+				if isPlayerStealing(plr) then
+					text ..= " 🔴"
+				end
+
+				nameLabel.Text = text
+			end
 		end
 
-		if isPlayerStealing(plr) then
-			text ..= " 🔴"
-		end
-
-		nameLabel.Text = text
-	end
-end
 		task.wait(1)
 	end
 end)
