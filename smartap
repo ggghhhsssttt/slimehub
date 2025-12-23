@@ -370,6 +370,5 @@ for plr, ownerTag in pairs(playerButtons) do
 	end
 end
 		task.wait(1)
-		refreshPlayers()
 	end
 end)
