@@ -1,0 +1,92 @@
+-- 3D RemainingTime ESP (LocalScript) - Updated
+-- Creates ONE green, always-visible 3D text label PER PLOT at the RemainingTime location (positioned lower)
+-- Mirrors the exact text value in real-time, visible through walls/anywhere
+-- Smaller size, better font (ArialBold for clarity)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- Function to validate if a TextLabel is a valid RemainingTime
+local function isValidRemainingTime(obj)
+    if not obj:IsA("TextLabel") or obj.Name ~= "RemainingTime" then return false end
+    
+    local billboardGui = obj.Parent
+    if not billboardGui:IsA("BillboardGui") or billboardGui.Name ~= "BillboardGui" then return false end
+    
+    local main = billboardGui.Parent
+    if not main:IsA("BasePart") or main.Name ~= "Main" then return false end
+    
+    local plotBlock = main.Parent
+    if not plotBlock or plotBlock.Name ~= "PlotBlock" then return false end
+    
+    local purchases = plotBlock.Parent
+    if not purchases or purchases.Name ~= "Purchases" then return false end
+    
+    local plot = purchases.Parent
+    local plotsFolder = Workspace:FindFirstChild("Plots")
+    if not plotsFolder or plot.Parent ~= plotsFolder then return false end
+    
+    return true
+end
+
+-- Create 3D ESP label for a RemainingTime (one per plot)
+local function createTimerESP(remainingTime)
+    local main = remainingTime.Parent.Parent  -- BillboardGui > Main
+    if main:FindFirstChild("TimerESP") then return end  -- Ensure only one
+    
+    -- New BillboardGui (attached to same Main part)
+    local espBillboard = Instance.new("BillboardGui")
+    espBillboard.Name = "TimerESP"
+    espBillboard.Adornee = main
+    espBillboard.Size = UDim2.new(0, 200, 0, 40)  -- Smaller size
+    espBillboard.StudsOffset = Vector3.new(0, -2.5, 0)  -- Positioned lower
+    espBillboard.AlwaysOnTop = true
+    espBillboard.LightInfluence = 0
+    espBillboard.Parent = main
+    
+    local espLabel = Instance.new("TextLabel")
+    espLabel.Name = "Label"
+    espLabel.Size = UDim2.new(1, 0, 1, 0)
+    espLabel.BackgroundTransparency = 1
+    espLabel.Font = Enum.Font.ArialBold  -- Better font for clarity
+    espLabel.TextSize = 18
+    espLabel.TextColor3 = Color3.fromRGB(0, 255, 0)  -- Bright green
+    espLabel.TextStrokeTransparency = 0
+    espLabel.TextStrokeColor3 = Color3.new(0, 0, 0)  -- Black stroke
+    espLabel.TextScaled = true
+    espLabel.Parent = espBillboard
+    
+    -- Mirror text in real-time
+    local function updateText()
+        espLabel.Text = remainingTime.Text
+    end
+    updateText()
+    remainingTime:GetPropertyChangedSignal("Text"):Connect(updateText)
+    
+    -- Cleanup if original is destroyed
+    remainingTime.AncestryChanged:Connect(function()
+        if not remainingTime.Parent then
+            espBillboard:Destroy()
+        end
+    end)
+end
+
+-- Initial scan for all existing timers
+for _, obj in ipairs(Workspace:GetDescendants()) do
+    if isValidRemainingTime(obj) then
+        createTimerESP(obj)
+    end
+end
+
+-- Watch for new RemainingTime labels (new plots, etc.)
+Workspace.DescendantAdded:Connect(function(obj)
+    if isValidRemainingTime(obj) then
+        task.wait(0.1)  -- Tiny delay
+        createTimerESP(obj)
+    end
+end)
+
+print("Updated 3D Timer ESP loaded! Smaller green labels (one per plot, lower position) on ALL plot timers (through walls).")
