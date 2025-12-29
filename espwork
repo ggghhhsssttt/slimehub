@@ -1,1 +1,130 @@
+-- Universal asdLocalScript (Updated)
+-- Features:
+-- • Green usernames (real username, not DisplayName) above every player except yourself
+-- • No text on your own head
+-- • Green highlight (outline) on every other player
+-- • All specified bodyparts stay fully opaque (Transparency = 0) everywhere in workspace
 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+
+local bodyParts = {
+    "Head", "UpperTorso", "LowerTorso",
+    "LeftFoot", "LeftLowerLeg", "LeftUpperLeg",
+    "RightFoot", "RightLowerLeg", "RightUpperLeg",
+    "LeftHand", "LeftLowerArm", "LeftUpperArm",
+    "RightHand", "RightLowerArm", "RightUpperArm"
+}
+
+-- Transparency Manager (keeps all matching bodyparts fully opaque)
+local transparentParts = {}
+
+local function setupTransparency()
+    local function onDescendantAdded(obj)
+        if obj:IsA("BasePart") and table.find(bodyParts, obj.Name) then
+            transparentParts[obj] = true
+            obj.Transparency = 0
+        end
+    end
+
+    -- Initial scan
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        onDescendantAdded(obj)
+    end
+
+    -- New parts
+    Workspace.DescendantAdded:Connect(onDescendantAdded)
+
+    -- Keep them opaque forever
+    RunService.Heartbeat:Connect(function()
+        for part in pairs(transparentParts) do
+            if part and part.Parent then
+                part.Transparency = 0
+            else
+                transparentParts[part] = nil
+            end
+        end
+    end)
+end
+
+-- ESP & Highlight Manager
+local function createESP(plr, char)
+    task.spawn(function()
+        task.wait(0.5) -- Wait for character to fully load
+
+        local head = char:FindFirstChild("Head")
+        if not head then return end
+
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if not humanoid then return end
+
+        -- Skip local player (no text, no highlight)
+        if plr == LocalPlayer then return end
+
+        -- Name label (real username, not DisplayName)
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "NameESP"
+        billboard.Adornee = head
+        billboard.Size = UDim2.new(0, 150, 0, 40)
+        billboard.StudsOffset = Vector3.new(0, 3, 0)
+        billboard.AlwaysOnTop = true
+        billboard.LightInfluence = 0
+        billboard.Parent = head
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 16
+        label.TextColor3 = Color3.fromRGB(0, 255, 0) -- Green
+        label.TextStrokeTransparency = 0
+        label.TextStrokeColor3 = Color3.new(0, 0, 0)
+        label.TextScaled = true
+        label.Text = plr.Name  -- Real username
+        label.Parent = billboard
+
+        -- Green highlight (outline)
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "ESPHighlight"
+        highlight.FillTransparency = 1
+        highlight.OutlineColor = Color3.fromRGB(0, 255, 0) -- Green
+        highlight.OutlineTransparency = 0
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Adornee = char
+        highlight.Parent = char
+    end)
+end
+
+local function onPlayerAdded(plr)
+    -- Skip local player
+    if plr == LocalPlayer then return end
+
+    plr.CharacterAdded:Connect(function(char)
+        createESP(plr, char)
+    end)
+
+    if plr.Character then
+        createESP(plr, plr.Character)
+    end
+end
+
+-- Setup for existing players
+for _, plr in ipairs(Players:GetPlayers()) do
+    onPlayerAdded(plr)
+end
+
+-- New players
+Players.PlayerAdded:Connect(onPlayerAdded)
+
+-- LocalPlayer respawn (no ESP on yourself)
+LocalPlayer.CharacterAdded:Connect(function()
+    -- Nothing needed - we already skip local player
+end)
+
+-- Start transparency manager
+setupTransparency()
+
+print("Universal ESP loaded! Green names + highlights on everyone except you, bodyparts fully opaque.")
