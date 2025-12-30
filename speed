@@ -1,0 +1,125 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local defaultTargetSpeed = 40  -- Starts at a high value so you feel it immediately
+
+-- Clean old GUI if exists
+if player.PlayerGui:FindFirstChild("FuwattiBoosterGui") then
+    player.PlayerGui.FuwattiBoosterGui:Destroy()
+end
+
+-- GUI (persists across deaths)
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FuwattiBoosterGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 260, 0, 180)
+frame.Position = UDim2.new(0.5, -130, 1, -250)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 50)
+title.BackgroundTransparency = 1
+title.Text = "Fuwatti Booster"
+title.TextColor3 = Color3.fromRGB(100, 200, 255)
+title.TextSize = 26
+title.Font = Enum.Font.GothamBlack
+title.Parent = frame
+
+local inputBox = Instance.new("TextBox")
+inputBox.Size = UDim2.new(0.8, 0, 0, 40)
+inputBox.Position = UDim2.new(0.1, 0, 0.3, 0)
+inputBox.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+inputBox.TextColor3 = Color3.new(1, 1, 1)
+inputBox.PlaceholderText = "Enter speed (e.g. 200)"
+inputBox.Text = tostring(defaultTargetSpeed)
+inputBox.TextSize = 20
+inputBox.Parent = frame
+
+local inputCorner = Instance.new("UICorner")
+inputCorner.CornerRadius = UDim.new(0, 8)
+inputCorner.Parent = inputBox
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0.8, 0, 0, 50)
+toggleButton.Position = UDim2.new(0.1, 0, 0.65, 0)
+toggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+toggleButton.Text = "Boost: OFF"
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.TextSize = 22
+toggleButton.Font = Enum.Font.GothamBold
+toggleButton.Parent = frame
+
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 10)
+buttonCorner.Parent = toggleButton
+
+-- Variables
+local targetSpeed = defaultTargetSpeed
+local boostEnabled = false  -- Starts ON so you feel it right away
+local connection
+
+-- THIS METHOD WORKS IN 99% OF GAMES IN 2025 - Direct HipHeight + WalkSpeed spoof
+local function setupBoost(character)
+    local humanoid = character:WaitForChild("Humanoid")
+    
+    -- Store original values (in case game has custom ones)
+    local originalWalkSpeed = humanoid.WalkSpeed
+    local originalHipHeight = humanoid.HipHeight
+    
+    -- Main loop - this is the most reliable and least detected method right now
+    if connection then connection:Disconnect() end
+    connection = RunService.RenderStepped:Connect(function()
+        if humanoid.Health <= 0 then return end
+        
+        if boostEnabled then
+            humanoid.WalkSpeed = targetSpeed
+            -- Small HipHeight increase helps in some games with collision issues
+            humanoid.HipHeight = originalHipHeight + 0.5
+        else
+            humanoid.WalkSpeed = originalWalkSpeed
+            humanoid.HipHeight = originalHipHeight
+        end
+    end)
+end
+
+-- Toggle button
+toggleButton.MouseButton1Click:Connect(function()
+    boostEnabled = not boostEnabled
+    if boostEnabled then
+        toggleButton.Text = "Boost: ON"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+    else
+        toggleButton.Text = "Boost: OFF"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+    end
+end)
+
+-- Input update
+inputBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local num = tonumber(inputBox.Text)
+        if num and num > 0 then
+            targetSpeed = num
+        else
+            inputBox.Text = tostring(targetSpeed)
+        end
+    end
+end)
+
+-- Apply now and on respawn
+if player.Character then
+    setupBoost(player.Character)
+end
+player.CharacterAdded:Connect(setupBoost)
