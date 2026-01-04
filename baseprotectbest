@@ -1,4 +1,4 @@
--- fuwatti's Base Protector v2 (AUTO + THREAT + AUTO AP HARD FIX)
+-- fuwatti's Base Protector v2 (admin panel and auto ap update)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -7,6 +7,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+
+local AutoAPRemote = ReplicatedStorage
+    :WaitForChild("Packages")
+    :WaitForChild("Net")
+    :WaitForChild("RE/352aad58-c786-4998-886b-3e4fa390721e")
 
 -- ================= CONFIG =================
 local THREAT_DURATION = 7
@@ -25,30 +30,6 @@ local THREAT_TOOLS = {
     ["Magic Carpet"] = true
 }
 -- =========================================
-
---------------------------------------------------
--- FIND ADMIN REMOTE
---------------------------------------------------
-local function getRemote(timeout)
-    local start = os.clock()
-    timeout = timeout or 6
-
-    while os.clock() - start < timeout do
-        local pkg = ReplicatedStorage:FindFirstChild("Packages")
-        if pkg then
-            local net = pkg:FindFirstChild("Net")
-            if net then
-                local re = net:FindFirstChild("RE/AdminPanelService/ExecuteCommand")
-                if re and re:IsA("RemoteEvent") then
-                    return re
-                end
-            end
-        end
-        RunService.Heartbeat:Wait()
-    end
-end
-
-local AdminRemote = getRemote()
 
 --------------------------------------------------
 -- BASE FIND
@@ -312,26 +293,6 @@ Players.PlayerAdded:Connect(updateDropdown)
 Players.PlayerRemoving:Connect(updateDropdown)
 updateDropdown()
 
--- UPDATE AUTO AP HEARTBEAT
-RunService.Heartbeat:Connect(function()
-    if not autoAPEnabled or not triggerFlag or frameLock or not AdminRemote then return end
-    frameLock = true
-    triggerFlag = false
-
-    local target = lockedTarget or getNearest()
-    if target then
-        for _ = 1, BURSTS do
-            for _, cmd in ipairs(COMMANDS) do
-                AdminRemote:FireServer(target, cmd)
-            end
-        end
-    end
-
-    RunService.Heartbeat:Once(function()
-        frameLock = false
-    end)
-end)
-
 
 local Mouse = player:GetMouse()
 
@@ -355,6 +316,123 @@ end)
 -- ================= THREAT ESP =================
 -- Make frame slightly bigger
 frame.Size = UDim2.fromOffset(260, 250)
+
+--------------------------------------------------
+-- PLAYER LIST (TARGET EXECUTOR)
+--------------------------------------------------
+
+-- Container
+local playerList = Instance.new("Frame", frame)
+playerList.Size = UDim2.new(0.85, 0, 0, 140)
+playerList.Position = UDim2.new(0.075, 0, 1, 10)
+playerList.BackgroundColor3 = Color3.fromRGB(25,25,35)
+playerList.BorderSizePixel = 0
+Instance.new("UICorner", playerList).CornerRadius = UDim.new(0,10)
+
+local stroke = Instance.new("UIStroke", playerList)
+stroke.Color = Color3.fromRGB(70,70,90)
+stroke.Thickness = 1
+
+-- Scroll
+local scroll = Instance.new("ScrollingFrame", playerList)
+scroll.Size = UDim2.fromScale(1,1)
+scroll.CanvasSize = UDim2.new(0,0,0,0)
+scroll.ScrollBarImageTransparency = 0.4
+scroll.AutomaticCanvasSize = Enum.AutomaticSize.None
+scroll.BackgroundTransparency = 1
+
+local layout = Instance.new("UIListLayout", scroll)
+layout.Padding = UDim.new(0,6)
+
+Instance.new("UIPadding", scroll).PaddingTop = UDim.new(0,6)
+Instance.new("UIPadding", scroll).PaddingBottom = UDim.new(0,6)
+Instance.new("UIPadding", scroll).PaddingLeft = UDim.new(0,6)
+Instance.new("UIPadding", scroll).PaddingRight = UDim.new(0,6)
+
+-- Clear list
+local function clearList()
+    for _, c in ipairs(scroll:GetChildren()) do
+        if c:IsA("Frame") then
+            c:Destroy()
+        end
+    end
+end
+
+-- Execute commands on target
+local function executeCommands(target)
+    if not target then return end
+    for _ = 1, BURSTS do
+        for _, cmd in ipairs(COMMANDS) do
+            AutoAPRemote:FireServer(
+                "78a772b6-9e1c-4827-ab8b-04a07838f298",
+                target,
+                cmd
+            )
+        end
+    end
+end
+
+-- Build list
+local function rebuildList()
+    clearList()
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then
+            local row = Instance.new("Frame", scroll)
+            row.Size = UDim2.new(1,0,0,46)
+            row.BackgroundColor3 = Color3.fromRGB(35,35,50)
+            Instance.new("UICorner", row).CornerRadius = UDim.new(0,8)
+
+            -- Avatar
+            local img = Instance.new("ImageLabel", row)
+            img.Size = UDim2.fromOffset(36,36)
+            img.Position = UDim2.fromOffset(5,5)
+            img.BackgroundTransparency = 1
+
+            local thumb, ready = Players:GetUserThumbnailAsync(
+                plr.UserId,
+                Enum.ThumbnailType.HeadShot,
+                Enum.ThumbnailSize.Size100x100
+            )
+            if ready then img.Image = thumb end
+
+            -- Name
+            local name = Instance.new("TextLabel", row)
+            name.Size = UDim2.new(0.5, -46, 1, 0)
+            name.Position = UDim2.fromOffset(46,0)
+            name.BackgroundTransparency = 1
+            name.Text = plr.Name
+            name.TextColor3 = Color3.new(1,1,1)
+            name.Font = Enum.Font.GothamBold
+            name.TextSize = 14
+            name.TextXAlignment = Enum.TextXAlignment.Left
+
+            -- Button
+            local btn = Instance.new("TextButton", row)
+            btn.Size = UDim2.fromOffset(70,28)
+            btn.Position = UDim2.new(1, -76, 0.5, -14)
+            btn.Text = "EXEC"
+            btn.Font = Enum.Font.GothamBold
+            btn.TextSize = 13
+            btn.TextColor3 = Color3.new(1,1,1)
+            btn.BackgroundColor3 = Color3.fromRGB(180,60,60)
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+
+            btn.MouseButton1Click:Connect(function()
+                executeCommands(plr)
+            end)
+        end
+    end
+
+    task.wait()
+    scroll.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y + 6)
+end
+
+-- Auto refresh
+Players.PlayerAdded:Connect(rebuildList)
+Players.PlayerRemoving:Connect(rebuildList)
+rebuildList()
+
 
 -- Create small ESP button higher
 local espBtn = Instance.new("TextButton", frame)
@@ -550,7 +628,7 @@ local function getNearest()
 end
 
 RunService.Heartbeat:Connect(function()
-    if not autoAPEnabled or not triggerFlag or frameLock or not AdminRemote then return end
+if not autoAPEnabled or not triggerFlag or frameLock then return end
     frameLock = true
     triggerFlag = false
 
@@ -558,7 +636,12 @@ RunService.Heartbeat:Connect(function()
     if target then
         for _ = 1, BURSTS do
             for _, cmd in ipairs(COMMANDS) do
-                AdminRemote:FireServer(target, cmd)
+            local args = {
+            "78a772b6-9e1c-4827-ab8b-04a07838f298",
+            target,
+            cmd
+        }
+        AutoAPRemote:FireServer(unpack(args))
             end
         end
     end
