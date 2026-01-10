@@ -9,12 +9,14 @@ local player = Players.LocalPlayer
 local autoPotionEnabled = false
 local speedBoostEnabled = false
 local autoKick = false
+local unwalkEnabled = false
 local currentSpeed = 33
 
 -- UI References
 local autoPotionBtn
 local speedBtn
 local kickBtn
+local unwalkBtn
 
 -- Speed Boost
 local speedConnection
@@ -98,7 +100,7 @@ sg.ResetOnSpawn = false
 sg.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 250)
+frame.Size = UDim2.new(0, 280, 0, 260)
 frame.Position = UDim2.new(0.5, -140, 0.3, 0)
 frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 frame.Active = true
@@ -141,7 +143,7 @@ end)
 
 -- Speed Boost Button
 speedBtn = Instance.new("TextButton")
-speedBtn.Size = UDim2.new(1, -20, 0, 45)
+speedBtn.Size = UDim2.new(0.65, -5, 0, 45)
 speedBtn.Position = UDim2.new(0, 10, 0, 95)
 speedBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 150)
 speedBtn.Text = "Speed Boost [OFF]"
@@ -156,6 +158,42 @@ speedBtn.MouseButton1Click:Connect(function()
         disableSpeed()
     else
         enableSpeed()
+    end
+end)
+
+-- Unwalk Button (smaller, next to Speed Boost)
+unwalkBtn = Instance.new("TextButton")
+unwalkBtn.Size = UDim2.new(0.35, -15, 0, 45)
+unwalkBtn.Position = UDim2.new(0.65, 5, 0, 95)
+unwalkBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 100)
+unwalkBtn.Text = "Unwalk"
+unwalkBtn.TextColor3 = Color3.new(1, 1, 1)
+unwalkBtn.Font = Enum.Font.GothamBold
+unwalkBtn.TextSize = 13
+unwalkBtn.Parent = frame
+Instance.new("UICorner", unwalkBtn).CornerRadius = UDim.new(0, 10)
+
+local unwalkTrack
+unwalkBtn.MouseButton1Click:Connect(function()
+    unwalkEnabled = not unwalkEnabled
+    unwalkBtn.BackgroundColor3 = unwalkEnabled and Color3.fromRGB(100, 100, 200) or Color3.fromRGB(60, 60, 100)
+    
+    local char = player.Character
+    if not char then return end
+    local hum = char:FindFirstChildWhichIsA("Humanoid")
+    if not hum then return end
+    
+    if unwalkEnabled then
+        local animation = Instance.new("Animation")
+        animation.AnimationId = "rbxassetid://10921259953"
+        unwalkTrack = hum:LoadAnimation(animation)
+        unwalkTrack.Priority = Enum.AnimationPriority.Movement
+        unwalkTrack:Play()
+    else
+        if unwalkTrack then
+            unwalkTrack:Stop()
+            unwalkTrack = nil
+        end
     end
 end)
 
