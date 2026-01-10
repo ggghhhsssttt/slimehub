@@ -10,7 +10,7 @@ local autoPotionEnabled = false
 local speedBoostEnabled = false
 local autoKick = false
 local unwalkEnabled = false
-local currentSpeed = 32
+local currentSpeed = 30
 
 -- UI References
 local autoPotionBtn
@@ -273,7 +273,7 @@ local function updateSlider(x)
     local val = math.clamp((x - fp) / fs, 0, 1)
     
     -- 33 to 34
-    local speed = 32 + val
+    local speed = 33 + val
     speed = math.floor(speed * 10 + 0.5) / 10
     
     currentSpeed = speed
