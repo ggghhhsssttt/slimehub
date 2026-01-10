@@ -10,7 +10,7 @@ local autoPotionEnabled = false
 local speedBoostEnabled = false
 local autoKick = false
 local unwalkEnabled = false
-local currentSpeed = 30
+local currentSpeed = 32
 
 -- UI References
 local autoPotionBtn
@@ -112,7 +112,7 @@ Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
-title.Text = "Fast Steal"
+title.Text = "Fast Steal v2"
 title.TextColor3 = Color3.fromRGB(200, 150, 255)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 18
